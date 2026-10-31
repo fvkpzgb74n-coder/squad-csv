@@ -69,12 +69,14 @@ struct LineupEditorView: View {
         .toolbar { toolbar }
         .sheet(item: $pickerTarget) { target in
             PlayerPickerView(lineup: $lineup, target: target)
+                .environment(store)
         }
         .sheet(isPresented: $isEditingDetails) {
             LineupDetailsView(lineup: $lineup)
         }
         .sheet(isPresented: $isShowingPaywall) {
             ProPaywallView(reason: "Match Day mode is part of Lineup Pro.")
+                .environment(pro)
         }
         .fullScreenCover(isPresented: $isShowingMatchDay) {
             MatchDayView(lineup: $lineup)

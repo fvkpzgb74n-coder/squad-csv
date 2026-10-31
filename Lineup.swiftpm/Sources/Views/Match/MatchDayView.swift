@@ -73,6 +73,7 @@ struct MatchDayView: View {
             }
             .sheet(item: $substitutionSlot) { slot in
                 SubstitutionSheet(lineup: $lineup, slotIndex: slot.index)
+                    .environment(store)
             }
             .confirmationDialog("End the match?", isPresented: $isConfirmingFullTime, titleVisibility: .visible) {
                 Button("Full Time") { lineup.match?.finish() }

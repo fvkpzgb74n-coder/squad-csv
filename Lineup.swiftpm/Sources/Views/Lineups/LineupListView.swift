@@ -71,9 +71,11 @@ struct LineupListView: View {
             }
             .sheet(isPresented: $isCreating) {
                 NewLineupView()
+                    .environment(store)
             }
             .sheet(isPresented: $isShowingPaywall) {
                 ProPaywallView(reason: pro.isPro ? nil : "The free version holds up to \(ProStore.freeLineupLimit) lineups. Upgrade for unlimited lineups and Match Day mode.")
+                    .environment(pro)
             }
         }
     }

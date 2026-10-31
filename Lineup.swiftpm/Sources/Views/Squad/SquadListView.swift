@@ -62,12 +62,15 @@ struct SquadListView: View {
             .toolbar { toolbar }
             .sheet(isPresented: $isShowingPaywall) {
                 ProPaywallView(reason: "The free version holds up to \(ProStore.freePlayerLimit) players. Upgrade for an unlimited squad.")
+                    .environment(pro)
             }
             .sheet(isPresented: $isAddingPlayer) {
                 PlayerEditView(player: nil)
+                    .environment(store)
             }
             .sheet(item: $editingPlayer) { player in
                 PlayerEditView(player: player)
+                    .environment(store)
             }
             .fileImporter(
                 isPresented: $isImporting,
