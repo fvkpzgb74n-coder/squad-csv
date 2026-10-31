@@ -89,7 +89,8 @@ struct MatchDayView: View {
                     lineup.startMatch()
                 } else {
                     // Pick up any lineup changes made outside Match Day.
-                    lineup.match?.sync(onPitch: Set(lineup.startingPlayerIDs))
+                    let onPitch = Set(lineup.startingPlayerIDs)
+                    lineup.match?.sync(onPitch: onPitch)
                 }
             }
         }

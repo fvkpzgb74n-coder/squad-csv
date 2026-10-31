@@ -211,7 +211,8 @@ struct Lineup: Identifiable, Codable, Hashable {
         if let off, !isSelected(off) {
             bench.append(off)
         }
-        match?.sync(onPitch: Set(startingPlayerIDs), at: now)
+        let onPitch = Set(startingPlayerIDs)
+        match?.sync(onPitch: onPitch, at: now)
         match?.recordSubstitution(on: playerID, off: off, at: now)
     }
 
