@@ -2,14 +2,14 @@ import Foundation
 import Observation
 import StoreKit
 
-/// Handles the one-off "Lineup Pro" in-app purchase.
+/// Handles the one-off "Matchday XI Pro" in-app purchase.
 ///
 /// Setup: in App Store Connect, create a **Non-Consumable** in-app purchase whose
 /// Product ID matches `productID` below, and set its price (e.g. 3.99).
 @MainActor
 @Observable
 final class ProStore {
-    static let productID = "com.example.SquadCSV.pro"
+    static let productID = "com.matchdayxi.app.pro"
 
     /// Limits for the free version.
     static let freePlayerLimit = 20

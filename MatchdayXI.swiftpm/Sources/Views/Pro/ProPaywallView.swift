@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Explains Lineup Pro and lets the user buy or restore it.
+/// Explains Matchday XI Pro and lets the user buy or restore it.
 struct ProPaywallView: View {
     /// Why the paywall appeared, e.g. "Free version is limited to 3 lineups."
     var reason: String? = nil
@@ -16,7 +16,7 @@ struct ProPaywallView: View {
                         Image(systemName: "crown.fill")
                             .font(.system(size: 56))
                             .foregroundStyle(.yellow.gradient)
-                        Text("Lineup Pro")
+                        Text("Matchday XI Pro")
                             .font(.largeTitle.weight(.heavy))
                         if let reason {
                             Text(reason)

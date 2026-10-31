@@ -1,21 +1,21 @@
 // swift-tools-version: 5.9
 
-// This package is a Swift Playgrounds app: open Lineup.swiftpm in Swift Playgrounds
+// This package is a Swift Playgrounds app: open MatchdayXI.swiftpm in Swift Playgrounds
 // on iPad or Mac (or in Xcode) to run it. SquadCSV.xcodeproj builds the same sources.
 
 import PackageDescription
 import AppleProductTypes
 
 let package = Package(
-    name: "Lineup",
+    name: "MatchdayXI",
     platforms: [
         .iOS("17.0")
     ],
     products: [
         .iOSApplication(
-            name: "Lineup",
+            name: "Matchday XI",
             targets: ["AppModule"],
-            bundleIdentifier: "com.example.SquadCSV",
+            bundleIdentifier: "com.matchdayxi.app",
             displayVersion: "1.0",
             bundleVersion: "1",
             appIcon: .asset("AppIcon"),

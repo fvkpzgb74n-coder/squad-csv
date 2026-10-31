@@ -1,6 +1,6 @@
 # squad-csv
 
-**Lineup** is a native iPhone app (SwiftUI, iOS 17+) for managing a football squad and building matchday lineups. You can bring the squad in from a CSV file, or add players by hand.
+**Matchday XI** is a native iPhone app (SwiftUI, iOS 17+) for managing a football squad and building matchday lineups. You can bring the squad in from a CSV file, or add players by hand.
 
 ## Features
 
@@ -19,7 +19,7 @@
   - 7-a-side: 2-3-1, 3-2-1
   - 5-a-side: 2-2, 1-2-1
 - **Sharing**: share a lineup as an image of the pitch along with a text team sheet, or copy the team sheet as text.
-- **Lineup Pro** is a one-off in-app purchase. The free version allows up to 20 players and 3 lineups. Pro adds:
+- **Matchday XI Pro** is a one-off in-app purchase. The free version allows up to 20 players and 3 lineups. Pro adds:
   - unlimited players and lineups;
   - **Match Day mode**: a live match clock with halves, a score, one-tap substitutions from the bench, a match timeline, and each player's minutes on the pitch, with the player who's had the least time marked "Due on".
 - Everything is saved on the device automatically, as JSON in the app's Documents folder.
@@ -30,26 +30,26 @@
 
 1. Install **Swift Playgrounds** (free) from the App Store.
 2. Download this project as a ZIP and unzip it in the **Files** app.
-3. Tap **Lineup.swiftpm**. It opens in Swift Playgrounds.
+3. Tap **MatchdayXI.swiftpm**. It opens in Swift Playgrounds.
 4. Tap ▶️ to run the app. To install it on your device, use the app's menu and choose to install it.
 
 ### On a Mac
 
-Open `SquadCSV.xcodeproj` (or `Lineup.swiftpm`) in **Xcode 16 or later**, pick an iPhone simulator, and press ⌘R. To run it on your own iPhone, choose your team under *Signing & Capabilities*. You may need to change the bundle identifier from `com.example.SquadCSV`.
+Open `SquadCSV.xcodeproj` (or `MatchdayXI.swiftpm`) in **Xcode 16 or later**, pick an iPhone simulator, and press ⌘R. To run it on your own iPhone, choose your team under *Signing & Capabilities*.
 
-Both open the same source code in `Lineup.swiftpm/Sources`.
+Both open the same source code in `MatchdayXI.swiftpm/Sources`.
 
 To try the app quickly, tap **Load Sample Squad** on the Squad tab, or import `SampleData/sample-squad.csv`.
 
 Run the unit tests in Xcode with ⌘U. They cover CSV parsing, import/export round-trips and the lineup logic. Swift Playgrounds doesn't run unit tests.
 
-## Setting up Lineup Pro (in-app purchase)
+## Setting up Matchday XI Pro (in-app purchase)
 
 1. Join the Apple Developer Program and create the app in [App Store Connect](https://appstoreconnect.apple.com).
 2. Under **Monetization → In-App Purchases**, create a **Non-Consumable** purchase:
-   - **Product ID:** `com.example.SquadCSV.pro`. This must match `ProStore.productID` in `Store/ProStore.swift`, so if you change the bundle ID, change both.
+   - **Product ID:** `com.matchdayxi.app.pro`. This must match `ProStore.productID` in `Store/ProStore.swift`, so if you change the bundle ID, change both.
    - **Price:** 3.99 in your currency. Apple converts it for other countries.
-   - Add a display name (for example "Lineup Pro"), a description and a review screenshot.
+   - Add a display name (for example "Matchday XI Pro"), a description and a review screenshot.
 3. Submit the in-app purchase together with your first app version.
 
 While testing (in Swift Playgrounds, Xcode or TestFlight), the Pro screen shows a **Test mode** switch that unlocks Pro for free. The App Store version never shows it.
@@ -72,7 +72,7 @@ Elliot Price,20,CM,No,Hamstring
 ## Project layout
 
 ```
-Lineup.swiftpm/   Swift Playgrounds app package (Package.swift)
+MatchdayXI.swiftpm/   Swift Playgrounds app package (Package.swift)
   Sources/        All app source code and assets
     App/          App entry point and tab view
     Models/        Player, Position, Formation, Lineup (pure Swift, unit-tested)

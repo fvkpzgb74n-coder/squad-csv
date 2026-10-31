@@ -75,7 +75,7 @@ struct LineupEditorView: View {
             LineupDetailsView(lineup: $lineup)
         }
         .sheet(isPresented: $isShowingPaywall) {
-            ProPaywallView(reason: "Match Day mode is part of Lineup Pro.")
+            ProPaywallView(reason: "Match Day mode is part of Matchday XI Pro.")
                 .environment(pro)
         }
         .fullScreenCover(isPresented: $isShowingMatchDay) {

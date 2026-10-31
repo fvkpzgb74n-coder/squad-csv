@@ -64,7 +64,7 @@ struct LineupListView: View {
                     Button {
                         isShowingPaywall = true
                     } label: {
-                        Label("Lineup Pro", systemImage: pro.isPro ? "crown.fill" : "crown")
+                        Label("Matchday XI Pro", systemImage: pro.isPro ? "crown.fill" : "crown")
                     }
                     .tint(.yellow)
                 }

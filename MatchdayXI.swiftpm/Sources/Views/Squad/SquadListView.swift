@@ -180,7 +180,7 @@ struct SquadListView: View {
                 Divider()
                 Button("Load Sample Squad", systemImage: "person.3.sequence") { loadSampleSquad() }
                 Divider()
-                Button(pro.isPro ? "Lineup Pro (Unlocked)" : "Upgrade to Pro…", systemImage: "crown") {
+                Button(pro.isPro ? "Pro (Unlocked)" : "Upgrade to Pro…", systemImage: "crown") {
                     isShowingPaywall = true
                 }
             } label: {
