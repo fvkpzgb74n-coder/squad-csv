@@ -19,6 +19,9 @@
   - 7-a-side: 2-3-1, 3-2-1
   - 5-a-side: 2-2, 1-2-1
 - **Sharing**: share a lineup as an image of the pitch along with a text team sheet, or copy the team sheet as text.
+- **Lineup Pro** is a one-off in-app purchase. The free version allows up to 20 players and 3 lineups. Pro adds:
+  - unlimited players and lineups;
+  - **Match Day mode**: a live match clock with halves, a score, one-tap substitutions from the bench, a match timeline, and each player's minutes on the pitch, with the player who's had the least time marked "Due on".
 - Everything is saved on the device automatically, as JSON in the app's Documents folder.
 
 ## Running it
@@ -39,6 +42,17 @@ Both open the same source code in `Lineup.swiftpm/Sources`.
 To try the app quickly, tap **Load Sample Squad** on the Squad tab, or import `SampleData/sample-squad.csv`.
 
 Run the unit tests in Xcode with ⌘U. They cover CSV parsing, import/export round-trips and the lineup logic. Swift Playgrounds doesn't run unit tests.
+
+## Setting up Lineup Pro (in-app purchase)
+
+1. Join the Apple Developer Program and create the app in [App Store Connect](https://appstoreconnect.apple.com).
+2. Under **Monetization → In-App Purchases**, create a **Non-Consumable** purchase:
+   - **Product ID:** `com.example.SquadCSV.pro`. This must match `ProStore.productID` in `Store/ProStore.swift`, so if you change the bundle ID, change both.
+   - **Price:** 3.99 in your currency. Apple converts it for other countries.
+   - Add a display name (for example "Lineup Pro"), a description and a review screenshot.
+3. Submit the in-app purchase together with your first app version.
+
+While testing (in Swift Playgrounds, Xcode or TestFlight), the Pro screen shows a **Test mode** switch that unlocks Pro for free. The App Store version never shows it.
 
 ## CSV format
 
@@ -62,10 +76,12 @@ Lineup.swiftpm/   Swift Playgrounds app package (Package.swift)
   Sources/        All app source code and assets
     App/          App entry point and tab view
     Models/        Player, Position, Formation, Lineup (pure Swift, unit-tested)
-    Store/         SquadStore – observable state + JSON persistence
+    Store/        SquadStore (saved data) and ProStore (in-app purchase)
     CSV/           CSV parser/writer and squad import/export
     Views/Squad/    Squad list and player editor
     Views/Lineups/  Lineup list, editor, player picker, share card
+    Views/Match/    Match Day mode (Pro)
+    Views/Pro/      Pro upgrade screen
     Views/Components/ Pitch drawing, player tokens and badges
 SquadCSV.xcodeproj  Xcode project (builds the same sources)
 SquadCSVTests/    XCTest unit tests

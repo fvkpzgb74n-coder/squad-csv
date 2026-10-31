@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct SquadCSVApp: App {
     @State private var store = SquadStore()
+    @State private var pro = ProStore()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(store)
+                .environment(pro)
         }
     }
 }
@@ -31,4 +33,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environment(SquadStore.preview())
+        .environment(ProStore())
 }

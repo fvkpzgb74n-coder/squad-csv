@@ -15,6 +15,9 @@ enum PickerTarget: Identifiable, Hashable {
 struct LineupEditorView: View {
     @Binding var lineup: Lineup
     @Environment(SquadStore.self) private var store
+    @Environment(ProStore.self) private var pro
+    @State private var isShowingMatchDay = false
+    @State private var isShowingPaywall = false
 
     @State private var pickerTarget: PickerTarget?
     @State private var isEditingDetails = false
@@ -31,6 +34,8 @@ struct LineupEditorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+
+                matchDayButton
 
                 PitchView(lineup: $lineup, playersByID: playersByID) { index in
                     pickerTarget = .slot(index)
@@ -68,12 +73,66 @@ struct LineupEditorView: View {
         .sheet(isPresented: $isEditingDetails) {
             LineupDetailsView(lineup: $lineup)
         }
+        .sheet(isPresented: $isShowingPaywall) {
+            ProPaywallView(reason: "Match Day mode is part of Lineup Pro.")
+        }
+        .fullScreenCover(isPresented: $isShowingMatchDay) {
+            MatchDayView(lineup: $lineup)
+                .environment(store)
+                .environment(pro)
+        }
         .task(id: ShareKey(lineup: lineup, players: store.players)) {
             shareImage = renderShareImage()
         }
     }
 
     // MARK: - Sections
+
+    private var matchDayButton: some View {
+        Button {
+            if pro.isPro {
+                isShowingMatchDay = true
+            } else {
+                isShowingPaywall = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "stopwatch.fill")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Color.green.gradient, in: RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Match Day Mode")
+                            .font(.headline)
+                        if !pro.isPro {
+                            ProBadge()
+                        }
+                    }
+                    Text(matchDaySubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var matchDaySubtitle: String {
+        guard let match = lineup.match else {
+            return "Match clock, score, subs and playing time"
+        }
+        if match.isFinished {
+            return "Full time: \(match.ourScore)–\(match.theirScore)"
+        }
+        return "In progress: \(match.ourScore)–\(match.theirScore), \(match.periodName)"
+    }
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -371,4 +430,5 @@ struct LineupShareCard: View {
         LineupEditorView(lineup: .constant(store.lineups[0]))
     }
     .environment(store)
+    .environment(ProStore())
 }

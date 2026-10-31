@@ -135,3 +135,57 @@ final class LineupTests: XCTestCase {
         XCTAssertNil(lineup.captainID)
     }
 }
+
+final class MatchSessionTests: XCTestCase {
+    private let squad = Player.sampleSquad
+    private let kickOff = Date(timeIntervalSinceReferenceDate: 0)
+
+    func testClockOnlyCountsWhileRunning() {
+        var session = MatchSession()
+        session.start(at: kickOff)
+        session.pause(at: kickOff.addingTimeInterval(600))
+        XCTAssertEqual(session.elapsed(at: kickOff.addingTimeInterval(900)), 600)
+        session.start(at: kickOff.addingTimeInterval(900))
+        XCTAssertEqual(session.elapsed(at: kickOff.addingTimeInterval(960)), 660)
+    }
+
+    func testSubstitutionSplitsPlayingTime() {
+        var lineup = Lineup(name: "Test")
+        let starter = squad[0].id, sub = squad[1].id
+        lineup.assign(starter, toSlot: 0)
+        lineup.toggleBench(sub)
+        lineup.startMatch()
+        lineup.match?.start(at: kickOff)
+
+        let twentyMinutes = kickOff.addingTimeInterval(1200)
+        lineup.substitute(sub, intoSlot: 0, at: twentyMinutes)
+
+        let end = kickOff.addingTimeInterval(1800)
+        XCTAssertEqual(lineup.match?.timePlayed(by: starter, at: end), 1200)
+        XCTAssertEqual(lineup.match?.timePlayed(by: sub, at: end), 600)
+        XCTAssertEqual(lineup.bench, [starter])
+        XCTAssertEqual(lineup.match?.events.last?.kind, .substitution)
+    }
+
+    func testFinishBanksTimeAndStopsClock() {
+        var lineup = Lineup(name: "Test")
+        lineup.assign(squad[0].id, toSlot: 0)
+        lineup.startMatch()
+        lineup.match?.start(at: kickOff)
+        lineup.match?.finish(at: kickOff.addingTimeInterval(300))
+        let later = kickOff.addingTimeInterval(5000)
+        XCTAssertEqual(lineup.match?.timePlayed(by: squad[0].id, at: later), 300)
+        XCTAssertEqual(lineup.match?.isFinished, true)
+    }
+
+    func testGoalsAndUndo() {
+        var session = MatchSession()
+        session.addGoal(forUs: true)
+        session.addGoal(forUs: true)
+        session.addGoal(forUs: false)
+        session.removeGoal(forUs: true)
+        XCTAssertEqual(session.ourScore, 1)
+        XCTAssertEqual(session.theirScore, 1)
+        XCTAssertEqual(session.events.map(\.kind), [.goalFor, .goalAgainst])
+    }
+}

@@ -2,7 +2,9 @@ import SwiftUI
 
 struct LineupListView: View {
     @Environment(SquadStore.self) private var store
+    @Environment(ProStore.self) private var pro
     @State private var isCreating = false
+    @State private var isShowingPaywall = false
 
     var body: some View {
         @Bindable var store = store
@@ -17,7 +19,7 @@ struct LineupListView: View {
                              ? "Add your squad first, then build a lineup for your next match."
                              : "Create a lineup to pick your starting team and substitutes.")
                     } actions: {
-                        Button("New Lineup") { isCreating = true }
+                        Button("New Lineup") { newLineup() }
                             .buttonStyle(.borderedProminent)
                     }
                 } else {
@@ -30,7 +32,11 @@ struct LineupListView: View {
                             }
                             .contextMenu {
                                 Button("Duplicate", systemImage: "plus.square.on.square") {
-                                    store.duplicateLineup(lineup)
+                                    if pro.canAddLineup(currentCount: store.lineups.count) {
+                                        store.duplicateLineup(lineup)
+                                    } else {
+                                        isShowingPaywall = true
+                                    }
                                 }
                                 Button("Delete", systemImage: "trash", role: .destructive) {
                                     store.lineups.removeAll { $0.id == lineup.id }
@@ -46,20 +52,37 @@ struct LineupListView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        isCreating = true
+                        newLineup()
                     } label: {
                         Label("New Lineup", systemImage: "plus")
                     }
                 }
-                if !store.lineups.isEmpty {
-                    ToolbarItem(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    if !store.lineups.isEmpty {
                         EditButton()
                     }
+                    Button {
+                        isShowingPaywall = true
+                    } label: {
+                        Label("Lineup Pro", systemImage: pro.isPro ? "crown.fill" : "crown")
+                    }
+                    .tint(.yellow)
                 }
             }
             .sheet(isPresented: $isCreating) {
                 NewLineupView()
             }
+            .sheet(isPresented: $isShowingPaywall) {
+                ProPaywallView(reason: pro.isPro ? nil : "The free version holds up to \(ProStore.freeLineupLimit) lineups. Upgrade for unlimited lineups and Match Day mode.")
+            }
+        }
+    }
+
+    private func newLineup() {
+        if pro.canAddLineup(currentCount: store.lineups.count) {
+            isCreating = true
+        } else {
+            isShowingPaywall = true
         }
     }
 }
@@ -201,4 +224,5 @@ struct FormationPreview: View {
 #Preview {
     LineupListView()
         .environment(SquadStore.preview())
+        .environment(ProStore())
 }

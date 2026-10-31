@@ -3,6 +3,8 @@ import UniformTypeIdentifiers
 
 struct SquadListView: View {
     @Environment(SquadStore.self) private var store
+    @Environment(ProStore.self) private var pro
+    @State private var isShowingPaywall = false
 
     @State private var editingPlayer: Player?
     @State private var isAddingPlayer = false
@@ -58,6 +60,9 @@ struct SquadListView: View {
             }
             .navigationTitle("Squad")
             .toolbar { toolbar }
+            .sheet(isPresented: $isShowingPaywall) {
+                ProPaywallView(reason: "The free version holds up to \(ProStore.freePlayerLimit) players. Upgrade for an unlimited squad.")
+            }
             .sheet(isPresented: $isAddingPlayer) {
                 PlayerEditView(player: nil)
             }
@@ -147,7 +152,7 @@ struct SquadListView: View {
                 .buttonStyle(.borderedProminent)
             Button("Import CSV") { isImporting = true }
                 .buttonStyle(.bordered)
-            Button("Load Sample Squad") { store.loadSampleSquad() }
+            Button("Load Sample Squad") { loadSampleSquad() }
         }
     }
 
@@ -155,7 +160,11 @@ struct SquadListView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Button {
-                isAddingPlayer = true
+                if pro.canAddPlayer(currentCount: store.players.count) {
+                    isAddingPlayer = true
+                } else {
+                    isShowingPaywall = true
+                }
             } label: {
                 Label("Add Player", systemImage: "plus")
             }
@@ -166,7 +175,11 @@ struct SquadListView: View {
                 Button("Export CSV…", systemImage: "square.and.arrow.up") { isExporting = true }
                     .disabled(store.players.isEmpty)
                 Divider()
-                Button("Load Sample Squad", systemImage: "person.3.sequence") { store.loadSampleSquad() }
+                Button("Load Sample Squad", systemImage: "person.3.sequence") { loadSampleSquad() }
+                Divider()
+                Button(pro.isPro ? "Lineup Pro (Unlocked)" : "Upgrade to Pro…", systemImage: "crown") {
+                    isShowingPaywall = true
+                }
             } label: {
                 Label("CSV", systemImage: "tablecells")
             }
@@ -190,9 +203,30 @@ struct SquadListView: View {
         }
     }
 
+    /// Squad size after an import, counting merged players with existing names only once.
+    private func squadSize(afterImporting players: [Player], replace: Bool) -> Int {
+        if replace { return players.count }
+        let newPlayers = players.filter { player in
+            !store.players.contains { $0.name.caseInsensitiveCompare(player.name) == .orderedSame }
+        }
+        return store.players.count + newPlayers.count
+    }
+
+    private func loadSampleSquad() {
+        if pro.canHavePlayers(squadSize(afterImporting: Player.sampleSquad, replace: false)) {
+            store.loadSampleSquad()
+        } else {
+            isShowingPaywall = true
+        }
+    }
+
     private func finishImport(replace: Bool) {
         guard let players = pendingImport else { return }
         pendingImport = nil
+        guard pro.canHavePlayers(squadSize(afterImporting: players, replace: replace)) else {
+            isShowingPaywall = true
+            return
+        }
         let result = store.importPlayers(players, replace: replace)
         if replace {
             message = "Imported \(result.added) players."
@@ -228,4 +262,5 @@ private struct SquadSummary: View {
 #Preview {
     SquadListView()
         .environment(SquadStore.preview())
+        .environment(ProStore())
 }

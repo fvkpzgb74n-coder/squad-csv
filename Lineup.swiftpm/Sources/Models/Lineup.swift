@@ -30,6 +30,8 @@ struct Lineup: Identifiable, Codable, Hashable {
     var bench: [UUID] = []
     var captainID: UUID?
     var notes = ""
+    /// Live match tracking (Pro). Nil until Match Day mode is first opened.
+    var match: MatchSession?
 
     init(name: String, opponent: String = "", date: Date = Date(), formation: Formation = .default) {
         self.name = name
@@ -192,10 +194,32 @@ struct Lineup: Identifiable, Codable, Hashable {
         if let captainID, !playerIDs.contains(captainID) { self.captainID = nil }
     }
 
+    // MARK: - Match day
+
+    mutating func startMatch() {
+        var session = MatchSession()
+        session.sync(onPitch: Set(startingPlayerIDs))
+        match = session
+    }
+
+    /// Brings a player on in place of whoever is in the slot. The player coming off goes to the bench.
+    mutating func substitute(_ playerID: UUID, intoSlot index: Int, at now: Date = Date()) {
+        guard slots.indices.contains(index) else { return }
+        let off = slots[index].playerID
+        guard off != playerID else { return }
+        assign(playerID, toSlot: index)
+        if let off, !isSelected(off) {
+            bench.append(off)
+        }
+        match?.sync(onPitch: Set(startingPlayerIDs), at: now)
+        match?.recordSubstitution(on: playerID, off: off, at: now)
+    }
+
     func duplicated() -> Lineup {
         var copy = self
         copy.id = UUID()
         copy.name = "\(name) (copy)"
+        copy.match = nil
         copy.slots = slots.map { slot in
             var slot = slot
             slot.id = UUID()
