@@ -69,7 +69,7 @@ struct LineupEditorView: View {
             LineupDetailsView(lineup: $lineup)
         }
         .task(id: ShareKey(lineup: lineup, players: store.players)) {
-            shareImage = await renderShareImage()
+            shareImage = renderShareImage()
         }
     }
 
