@@ -23,13 +23,22 @@
 
 ## Running it
 
-1. Open `SquadCSV.xcodeproj` in **Xcode 16 or later**.
-2. Select the `SquadCSV` scheme and an iPhone simulator, then press **Run** (⌘R).
-3. To run it on your own iPhone, choose your team under *Signing & Capabilities*. You may need to change the bundle identifier from `com.example.SquadCSV`.
+### On an iPad (no Mac needed)
+
+1. Install **Swift Playgrounds** (free) from the App Store.
+2. Download this project as a ZIP and unzip it in the **Files** app.
+3. Tap **Lineup.swiftpm**. It opens in Swift Playgrounds.
+4. Tap ▶️ to run the app. To install it on your device, use the app's menu and choose to install it.
+
+### On a Mac
+
+Open `SquadCSV.xcodeproj` (or `Lineup.swiftpm`) in **Xcode 16 or later**, pick an iPhone simulator, and press ⌘R. To run it on your own iPhone, choose your team under *Signing & Capabilities*. You may need to change the bundle identifier from `com.example.SquadCSV`.
+
+Both open the same source code in `Lineup.swiftpm/Sources`.
 
 To try the app quickly, tap **Load Sample Squad** on the Squad tab, or import `SampleData/sample-squad.csv`.
 
-Run the unit tests with ⌘U. They cover CSV parsing, import/export round-trips and the lineup logic.
+Run the unit tests in Xcode with ⌘U. They cover CSV parsing, import/export round-trips and the lineup logic. Swift Playgrounds doesn't run unit tests.
 
 ## CSV format
 
@@ -49,14 +58,16 @@ Elliot Price,20,CM,No,Hamstring
 ## Project layout
 
 ```
-SquadCSV/
-  App/            App entry point and tab view
-  Models/         Player, Position, Formation, Lineup (pure Swift, unit-tested)
-  Store/          SquadStore – observable state + JSON persistence
-  CSV/            CSV parser/writer and squad import/export
-  Views/Squad/    Squad list and player editor
-  Views/Lineups/  Lineup list, editor, player picker, share card
-  Views/Components/ Pitch drawing, player tokens and badges
+Lineup.swiftpm/   Swift Playgrounds app package (Package.swift)
+  Sources/        All app source code and assets
+    App/          App entry point and tab view
+    Models/        Player, Position, Formation, Lineup (pure Swift, unit-tested)
+    Store/         SquadStore – observable state + JSON persistence
+    CSV/           CSV parser/writer and squad import/export
+    Views/Squad/    Squad list and player editor
+    Views/Lineups/  Lineup list, editor, player picker, share card
+    Views/Components/ Pitch drawing, player tokens and badges
+SquadCSV.xcodeproj  Xcode project (builds the same sources)
 SquadCSVTests/    XCTest unit tests
 SampleData/       Example squad CSV
 ```

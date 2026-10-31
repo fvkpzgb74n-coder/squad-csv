@@ -35,6 +35,9 @@ struct LineupEditorView: View {
                 PitchView(lineup: $lineup, playersByID: playersByID) { index in
                     pickerTarget = .slot(index)
                 }
+                // Keep the pitch a sensible size on iPad.
+                .frame(maxWidth: 520)
+                .frame(maxWidth: .infinity)
 
                 Text("Tap a position to choose a player. Drag players to fine-tune where they stand.")
                     .font(.footnote)

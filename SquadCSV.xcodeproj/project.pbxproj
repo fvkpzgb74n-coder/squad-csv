@@ -24,7 +24,7 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5C0000000000000000000021 /* SquadCSV */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = SquadCSV;
+			path = Lineup.swiftpm/Sources;
 			sourceTree = "<group>";
 		};
 		5C0000000000000000000022 /* SquadCSVTests */ = {
@@ -324,7 +324,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"SquadCSV/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lineup;
@@ -355,7 +354,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"SquadCSV/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lineup;
