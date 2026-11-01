@@ -67,6 +67,7 @@ button:disabled { opacity: .4; cursor: default; }
 .stats .sv.h { text-align: left; }
 .stats .sv.a { text-align: right; }
 .stats .sl { color: var(--muted); font-size: 17px; text-align: center; }
+.stats-gap { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 4px 0; }
 .poss-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--away); overflow: hidden; margin-bottom: 4px; }
 .poss-bar span { display: block; height: 100%; width: 50%; background: linear-gradient(90deg, var(--home-sleeve), var(--home)); transition: width .4s; }
 button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -226,9 +227,12 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 </main>
 
 <aside>
-  <section id="match-panel" hidden>
+  <section id="match-panel">
     <h2>Match</h2>
     <div class="stats" id="stats">
+      <span class="sv h" id="st-def-h">50</span><span class="sl">Defensive line</span><span class="sv a" id="st-def-a">50</span>
+      <span class="sv h" id="st-spd-h">50</span><span class="sl">Attacking speed</span><span class="sv a" id="st-spd-a">50</span>
+      <div class="stats-gap"></div>
       <span class="sv h" id="st-poss-h">50%</span><span class="sl">Possession</span><span class="sv a" id="st-poss-a">50%</span>
       <div class="poss-bar"><span id="st-poss-bar"></span></div>
       <span class="sv h" id="st-shots-h">0</span><span class="sl">Shots</span><span class="sv a" id="st-shots-a">0</span>
@@ -672,6 +676,7 @@ function renderSide() {
     { kind: "bench", key: pl.pid, onTap: () => substitute(pl) }));
   if (!selected) document.getElementById("editor").hidden = true;
   updateScoreboard();
+  if (typeof updateMatchUI === "function") updateMatchUI();
   document.getElementById("home-formation").value = state.home.formation;
   document.getElementById("away-formation").value = state.away.formation;
   for (const s of ["home", "away"]) {

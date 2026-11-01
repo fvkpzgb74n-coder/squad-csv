@@ -124,6 +124,14 @@ function fullTime() {
 const scoreLine = () => `${state.home.name} ${match.score.home}–${match.score.away} ${state.away.name}`;
 
 const FORWARD_DEPTH = 24; // metres ahead of the back line on the board that makes a player a forward
+// Team tactics, 0–100, set by how good each XI is compared with the opposition:
+// the better side holds a higher line and attacks more patiently; the weaker side sits deeper and goes direct.
+const TACTIC_PER_POINT = 2; // tactic points per point of average rating difference
+function tacticsFor(side) {
+  const mine = avgOvr(state[side]) || 70, theirs = avgOvr(state[otherSide(side)]) || 70;
+  const edge = (mine - theirs) * TACTIC_PER_POINT;
+  return { defLine: Math.round(clamp(50 + edge, 15, 85)), attackSpeed: Math.round(clamp(50 - edge, 15, 85)) };
+}
 const CIRCLE_R = 9.15; // centre circle radius in metres
 const COUNTDOWN = 3;   // real seconds of 3-2-1 before each kick-off
 const MIDFIELD = ["DM", "CM", "AM", "CDM", "CAM", "LM", "RM"];
@@ -270,6 +278,7 @@ function movePlayers(dt) {
     const chase = match.pause <= 0 && !match.shot && (!attacking || (!match.owner && !match.passTo));
     // Height of our back line, in metres from our own goal, set by where the ball is
     const ballU = d * (b.x - ownGoalX(side));
+    const tactics = tacticsFor(side);
     // The opposition's last outfield defender: our forwards play off this line
     const opp = otherSide(side), od = dirOf(opp);
     const oppLineU = Math.min(...squadList(opp).filter(p => p.pos !== "GK").map(p => od * (p.x - ownGoalX(opp))));
@@ -277,7 +286,8 @@ function movePlayers(dt) {
     const shape = {
       oppLineX,
       ref: Math.min(...list.filter(p => p.pos !== "GK").map(p => d * (p.bx - ownGoalX(side)))),
-      line: attacking ? clamp(ballU - 24, 22, 60) : clamp(ballU - 18, 16, 58),
+      line: (attacking ? clamp(ballU - 24, 22, 60) : clamp(ballU - 18, 16, 58))
+        + (tactics.defLine - 50) * (attacking ? 0.1 : 0.16), // up to ±8 m when defending
     };
     for (const p of list) {
       let tx, ty, sprint = false;
@@ -371,7 +381,8 @@ function tackles(dt) {
 function carrierThink(dt) {
   const c = match.owner;
   if ((match.decide -= dt) > 0) return;
-  match.decide = 0.25 + Math.random() * 0.3;
+  const tempo = tacticsFor(c.side).attackSpeed / 100; // 0.15 (patient) to 0.85 (direct)
+  match.decide = (0.25 + Math.random() * 0.3) * (1.25 - tempo * 0.5); // quicker teams release the ball sooner
   if (match.kickoffTo) { const to = match.kickoffTo; match.kickoffTo = null; return pass(c, to); }
   const d = dirOf(c.side), opp = squadList(otherSide(c.side)), mates = squadList(c.side).filter(p => p !== c);
   const gx = goalX(c.side), toGoal = Math.hypot(gx - c.x, 34 - c.y);
@@ -386,7 +397,7 @@ function carrierThink(dt) {
   // so players recycle it to a free teammate (back to the centre-backs or keeper if needed).
   const ownHalf = d * (c.x - ownGoalX(c.side)) < PITCH_L / 2;
   const pressed = pressure < 4;
-  const progressWeight = ownHalf ? 0.25 : 0.5;
+  const progressWeight = (ownHalf ? 0.25 : 0.5) * (0.6 + tempo * 0.8); // ×1 at 50, more forward-minded when quicker
   let best = null, bestScore = -Infinity;
   for (const m of mates) {
     const L = dist(c, m);
@@ -398,7 +409,7 @@ function carrierThink(dt) {
     const inBox = Math.abs(gx - m.x) < 16 && Math.abs(m.y - 34) < 20;
     let score = progress * progressWeight + Math.min(space, 8) + Math.min(lane, 6) * 1.7 - L * 0.1
       + (lane < 1.5 ? -8 : 0) + (inBox ? 5 : 0) + Math.random() * 3;
-    if (ownHalf && progress < -3 && space > 6 && pressed) score += 3; // under pressure, a safe ball back to a free player
+    if (ownHalf && progress < -3 && space > 6 && pressed) score += 3 * (1.5 - tempo); // under pressure, a safe ball back; patient teams more so
     if (m.pos === "GK") score -= pressed ? 1 : 4; // the keeper is an outlet, mostly when pressed
     if (score > bestScore) { best = m; bestScore = score; }
   }
@@ -476,7 +487,14 @@ function updateMatchUI() {
   document.getElementById("speed").hidden = !on || match.over;
   document.getElementById("speed").textContent = `${match.speed}×`;
   document.getElementById("end-match").hidden = !on || match.over;
-  document.getElementById("match-panel").hidden = !on;
+  const t = { home: tacticsFor("home"), away: tacticsFor("away") };
+  const setT = (id, v) => { document.getElementById(id).textContent = v; };
+  setT("st-def-h", t.home.defLine); setT("st-def-a", t.away.defLine);
+  setT("st-spd-h", t.home.attackSpeed); setT("st-spd-a", t.away.attackSpeed);
+  if (!on) {
+    for (const id of ["st-poss-h", "st-poss-a", "st-shots-h", "st-shots-a", "st-goals-h", "st-goals-a"]) setT(id, "–");
+    document.getElementById("st-poss-bar").style.width = "50%";
+  }
   if (on) {
     const total = match.possTime.home + match.possTime.away;
     const pct = total ? Math.round((match.possTime.home / total) * 100) : 50;
@@ -501,3 +519,6 @@ document.getElementById("speed").addEventListener("click", () => {
 document.getElementById("end-match").addEventListener("click", () => {
   match.events = []; endMatch();
 });
+
+// Show the starting tactics once everything has loaded
+updateMatchUI();
