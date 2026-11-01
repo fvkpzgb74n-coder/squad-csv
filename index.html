@@ -96,7 +96,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card .stamina { display: block; width: 50px; height: 14px; padding: 2px; background: #000; box-shadow: 0 0 0 1px #2a2f55; }
 .card .stamina i { display: block; height: 100%; background: #1a1d36; }
 .card .stamina i b { display: block; height: 100%; width: 100%; }
-.card .nm { font-size: 22px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .nm { text-transform: uppercase; font-size: 22px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .pos { color: var(--muted); font-size: 17px; }
 #bench .card { background: transparent; }
 .drag-ghost { position: fixed; z-index: 10; pointer-events: none; width: 260px; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
@@ -587,7 +587,7 @@ function drawPlayer(p) {
   num.textContent = p.num;
   const lt = el("text", { y: KIT_H * ICON_SCALE / 2 + 1.5, "text-anchor": "middle", "font-size": 1.15, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .35, "paint-order": "stroke" }, g);
-  lt.textContent = (p.name || p.pos).toUpperCase();
+  lt.textContent = (knownAs(p.name) || p.pos).toUpperCase();
   kitNodes.set(p.id, { g, shadow, kit, num, dir: null });
   setFacing(p);
   makeDraggable(g, p);
@@ -719,6 +719,9 @@ function updateStaminaBars() {
     if (card) paintStamina(card, p.energy ?? 100);
   }
 }
+// The name a player is known by: their shirt name without any leading initials ("M.Bizot" -> "Bizot")
+const knownAs = name => (name || "").replace(/^(\p{Lu}\.\s*)+/u, "").trim() || name || "";
+
 function playerCard(num, name, pos, ovr, opts) {
   const d = document.createElement("div");
   d.className = "card" + (opts.sel ? " sel" : "") + (pos === "GK" ? " keeper" : "");
@@ -746,12 +749,12 @@ function renderSide() {
   // The panel always shows your team: the starting XI, then the bench
   const team = state.home;
   const r = document.getElementById("roster"); r.replaceChildren();
-  for (const p of team.players) r.appendChild(playerCard(p.num, p.full || p.name, p.pos, p.ovr,
+  for (const p of team.players) r.appendChild(playerCard(p.num, knownAs(p.name), p.pos, p.ovr,
     { kind: "xi", key: p.id, sel: p.id === selected, energy: p.energy, onTap: () => select(p.id) }));
 
   const bench = document.getElementById("bench"); bench.replaceChildren();
   const subs = benchOf(team);
-  for (const pl of subs) bench.appendChild(playerCard(pl.num, pl.full, pl.natural, pl.ovr,
+  for (const pl of subs) bench.appendChild(playerCard(pl.num, knownAs(pl.name), pl.natural, pl.ovr,
     { kind: "bench", key: pl.pid, onTap: () => substitute(pl) }));
   if (!selected) document.getElementById("editor").hidden = true;
   updateScoreboard();
