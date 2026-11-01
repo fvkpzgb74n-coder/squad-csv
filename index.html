@@ -217,6 +217,7 @@ const FORMATIONS = {
   "3-5-2":   [["GK",5,34],["CB",18,46],["CB",16,34],["CB",18,22],["RWB",34,60],["CM",33,44],["DM",29,34],["CM",33,24],["LWB",34,8],["ST",48,40],["ST",48,28]],
   "3-4-3":   [["GK",5,34],["CB",18,46],["CB",16,34],["CB",18,22],["RM",34,58],["CM",32,40],["CM",32,28],["LM",34,10],["RW",47,54],["ST",50,34],["LW",47,14]],
   "5-3-2":   [["GK",5,34],["RWB",24,60],["CB",17,46],["CB",15,34],["CB",17,22],["LWB",24,8],["CM",33,46],["CM",31,34],["CM",33,22],["ST",46,40],["ST",46,28]],
+  "3-4-2-1": [["GK",5,34],["CB",18,46],["CB",16,34],["CB",18,22],["RWB",34,60],["CM",32,40],["CM",32,28],["LWB",34,8],["AM",44,44],["AM",44,24],["ST",50,34]],
   "4-1-4-1": [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["DM",28,34],["RM",38,58],["CM",37,42],["CM",37,26],["LM",38,10],["ST",50,34]],
 };
 const HOME_NAMES = ["Okafor","Reid","Santos","Kowalski","Mensah","Lindqvist","Duarte","Haddad","Moreau","Tanaka","Byrne"];
@@ -263,6 +264,20 @@ function pickXI(squad, formation) {
   return chosen;
 }
 const RATINGS = ["ovr", "pace", "shooting", "passing", "dribbling", "defending", "physical"];
+// A club's formation: the shape whose best XI plays most in their natural positions.
+// The CSV has no team tactics, so this is inferred from the squad rather than taken from real life.
+// Back fours are the norm, so other shapes need a squad that clearly suits them.
+const FORMATION_PRIOR = { "4-3-3": 1, "4-2-3-1": 1.5, "4-4-2": 0, "4-1-4-1": 0, "3-4-2-1": -2, "3-4-3": -2.5, "3-5-2": -2.5, "5-3-2": -4 };
+function bestFormation(club) {
+  const squad = squadOf(club);
+  let best = "4-3-3", bestScore = -Infinity;
+  for (const f of Object.keys(FORMATIONS)) {
+    const slots = FORMATIONS[f].map(([pos]) => pos);
+    const score = (FORMATION_PRIOR[f] || 0) + pickXI(squad, f).reduce((sum, pl, i) => sum + (pl ? fitScore(pl, slots[i]) : -50), 0);
+    if (score > bestScore) { best = f; bestScore = score; }
+  }
+  return best;
+}
 function fromDb(pl) {
   if (!pl) return {};
   const out = { pid: pl.pid, name: pl.name, full: pl.full, num: pl.num };
@@ -311,7 +326,7 @@ function applyFormation(side, formation) {
 function loadClub(side, club) {
   state[side].club = club; state[side].name = club;
   selected = null;
-  applyFormation(side, state[side].formation);
+  applyFormation(side, bestFormation(club)); // each club lines up in its own formation; the dropdown can still change it
 }
 
 function el(tag, attrs, parent) {
