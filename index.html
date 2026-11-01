@@ -260,14 +260,14 @@ const KIT_SPRITES = {
     "...KTTTTTTTTTTK...",
     "...KKKKKKKKKKKK...",
   ],
-  NE: [ // back, turned three-quarters to the right
+  NE: [ // back, turned three-quarters to the right: near sleeve full, far sleeve shorter
     "......KKKKKKKK....",
-    "....KKTTTTTTTTK...",
+    "....KKTTTTTTTTKK..",
     "...KSBBBBBBBBBSK..",
-    "..KSSBBBBBBBBBSK..",
-    ".KSSSBBBBBBBBBSK..",
-    ".KCCSBBBBBBBBBCK..",
-    ".KKKKBBBBBBBBBKK..",
+    "..KSSBBBBBBBBBSSK.",
+    ".KSSSBBBBBBBBBSSK.",
+    ".KCCSBBBBBBBBBCCK.",
+    ".KKKKBBBBBBBBBKKK.",
     "....KHBBBBBBBBK...",
     "....KBBBBBBBBBK...",
     "....KBBBBBBBBBK...",
@@ -294,12 +294,12 @@ const KIT_SPRITES = {
   ],
   SE: [ // front, turned three-quarters to the right
     "......KKKKKKKK....",
-    "....KKTTKKKKTTK...",
+    "....KKTTKKKKTTKK..",
     "...KSBBBBTKKTBSK..",
-    "..KSSBBBBBTTBBSK..",
-    ".KSSSBBBBBBBWBSK..",
-    ".KCCSBBBBBBBBBCK..",
-    ".KKKKBBBBBBBBBKK..",
+    "..KSSBBBBBTTBBSSK.",
+    ".KSSSBBBBBBBWBSSK.",
+    ".KCCSBBBBBBBBBCCK.",
+    ".KKKKBBBBBBBBBKKK.",
     "....KHBBBBBBBBK...",
     "....KBBBBBBBBBK...",
     "....KBBBBBBBBBK...",
@@ -375,6 +375,8 @@ function setFacing(p) {
   n.num.setAttribute("x", nx);
   n.num.setAttribute("y", ny);
   n.num.setAttribute("font-size", (p.num.length > 1 ? 1.45 : 1.75) * scale);
+  // The number is printed on the back, so only show it when the back is in view
+  n.num.style.display = dir.startsWith("N") ? "" : "none";
 }
 function updateFacings() { for (const side of ["home", "away"]) state[side].players.forEach(setFacing); }
 
