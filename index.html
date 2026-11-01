@@ -309,6 +309,20 @@ function pickXI(squad, formation) {
     if (score === -Infinity || chosen[si] || used.has(pi)) continue;
     chosen[si] = squad[pi]; used.add(pi);
   }
+  // A back four never pairs two left-footed centre-backs: the weaker one makes way for the best
+  // right-footed option, preferring a natural centre-back, then anyone who can play there.
+  const cbIdx = slots.map((s, i) => i).filter(i => slots[i] === "CB");
+  if (cbIdx.length === 2 && cbIdx.every(i => chosen[i]?.foot === "L")) {
+    const inXI = new Set(chosen);
+    const rightFooted = squad.filter(pl => !inXI.has(pl) && pl.foot === "R" && pl.natural !== "GK");
+    const cbScore = pl => pl.natural === "CB" ? pl.ovr : pl.other.includes("CB") ? pl.ovr - 3
+      : ["CDM", "RB", "LB"].includes(pl.natural) ? pl.ovr - 10 : -Infinity;
+    const cover = rightFooted.filter(pl => cbScore(pl) > -Infinity).sort((a, b) => cbScore(b) - cbScore(a))[0];
+    if (cover) {
+      const weaker = cbIdx.sort((a, b) => chosen[a].ovr - chosen[b].ovr)[0];
+      chosen[weaker] = cover;
+    }
+  }
   // Put left-footed centre-backs on the left of the back line and right-footed ones on the right.
   // Formation y runs from the team's left touchline (0) to its right (68).
   const cbSlots = slots.map((s, i) => i).filter(i => slots[i] === "CB").sort((a, b) => FORMATIONS[formation][a][2] - FORMATIONS[formation][b][2]);
