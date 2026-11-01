@@ -334,23 +334,30 @@ function carrierThink(dt) {
     if (Math.random() < keen) return shoot(c);
   }
 
+  // Build-up: in our own half, keeping the ball matters more than going forward,
+  // so players recycle it to a free teammate (back to the centre-backs or keeper if needed).
+  const ownHalf = d * (c.x - ownGoalX(c.side)) < PITCH_L / 2;
+  const pressed = pressure < 4;
+  const progressWeight = ownHalf ? 0.25 : 0.5;
   let best = null, bestScore = -Infinity;
   for (const m of mates) {
     const L = dist(c, m);
     if (L < 4 || L > 45) continue;
-    if (m.pos === "GK" && Math.abs(c.x - ownGoalX(c.side)) > 30) continue;
+    if (m.pos === "GK" && !ownHalf) continue;
     const progress = d * (m.x - c.x);
     const lane = Math.min(...opp.map(o => segDist(o, c, m)));
     const space = Math.min(...opp.map(o => dist(o, m)));
     const inBox = Math.abs(gx - m.x) < 16 && Math.abs(m.y - 34) < 20;
-    const score = progress * 0.6 + Math.min(space, 8) + Math.min(lane, 5) * 1.6 - L * 0.08
+    let score = progress * progressWeight + Math.min(space, 8) + Math.min(lane, 6) * 1.7 - L * 0.1
       + (lane < 1.5 ? -8 : 0) + (inBox ? 5 : 0) + Math.random() * 3;
+    if (ownHalf && progress < -3 && space > 6 && pressed) score += 3; // under pressure, a safe ball back to a free player
+    if (m.pos === "GK") score -= pressed ? 1 : 4; // the keeper is an outlet, mostly when pressed
     if (score > bestScore) { best = m; bestScore = score; }
   }
 
   const ahead = opp.filter(o => d * (o.x - c.x) > 0 && dist(o, c) < 10);
   const room = ahead.length ? Math.min(...ahead.map(o => dist(o, c))) : 10;
-  const dribble = c.pos === "GK" ? -100 : room * 1.2 + attr(c, "dribbling") / 25 + Math.random() * 4 - (pressure < 2 ? 4 : 0);
+  const dribble = c.pos === "GK" ? -100 : room * 1.2 + attr(c, "dribbling") / 25 + Math.random() * 4 - (pressure < 2 ? 4 : 0) - (ownHalf ? 3 : 0);
 
   if (best && (bestScore > dribble || pressure < 2.2)) return pass(c, best);
   c.dx = clamp(c.x + d * 10, 1, PITCH_L - 1);
