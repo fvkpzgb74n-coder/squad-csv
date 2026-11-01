@@ -29,9 +29,9 @@ const attr = (p, key) => {
   const f = FATIGUE[key];
   return f ? base * (1 - f * (1 - (p.energy ?? 100) / 100)) : base;
 };
-// Stamina drain in % per match minute: about 30–55% over 90 minutes depending on the stamina rating.
+// Stamina drain in % per match minute: players finish about 45% (stamina 90+) down to about 20% (stamina 55).
 // Keepers barely run, so they tire far more slowly; sprinting tires everyone faster.
-const drainRate = p => (0.3 + (100 - (p.stamina || 65)) / 150) * (p.pos === "GK" ? 0.25 : 1);
+const drainRate = p => (0.6 + (100 - (p.stamina || 65)) / 120) * (p.pos === "GK" ? 0.25 : 1);
 const minute = () => Math.min(90, Math.floor(match.clock / 60) + 1);
 
 function segDist(p, a, b) { // distance from point p to the segment a–b
