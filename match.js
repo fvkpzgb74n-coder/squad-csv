@@ -101,7 +101,7 @@ function step(dt) {
   tackles(dt);
 }
 
-function restart(delay, fn) { match.owner = null; match.passTo = null; match.shot = null; match.pause = delay; match.then = fn; }
+function restart(delay, fn) { match.kickoffTo = null; match.owner = null; match.passTo = null; match.shot = null; match.pause = delay; match.then = fn; }
 
 function halfTime() {
   match.half = 2; match.clock = 45 * 60;
@@ -118,22 +118,40 @@ function fullTime() {
 
 const scoreLine = () => `${state.home.name} ${match.score.home}–${match.score.away} ${state.away.name}`;
 
+const CIRCLE_R = 9.15; // centre circle radius in metres
+const MIDFIELD = ["DM", "CM", "AM", "CDM", "CAM", "LM", "RM"];
+
+// Kick-off: the centre forward stands over the ball and plays it back to a central midfielder
+// waiting at the edge of the centre circle. Everyone else starts in their own half, outside the circle.
 function kickoff(side) {
-  const mid = PITCH_L / 2;
+  const mid = PITCH_L / 2, d = dirOf(side);
+  const outfield = squadList(side).filter(p => p.pos !== "GK");
+  const strikers = outfield.filter(p => p.pos === "ST" || p.pos === "CF");
+  const taker = (strikers.length ? strikers : outfield).sort((a, b) => Math.abs(a.by - 34) - Math.abs(b.by - 34) || d * (b.bx - a.bx))[0];
+  const mids = outfield.filter(p => p !== taker && MIDFIELD.includes(p.pos));
+  const receiver = (mids.length ? mids : outfield.filter(p => p !== taker)).sort((a, b) => Math.abs(a.by - 34) - Math.abs(b.by - 34))[0];
+
   for (const p of everyone()) {
-    const d = dirOf(p.side);
-    let x = d > 0 ? Math.min(p.bx, mid - 1) : Math.max(p.bx, mid + 1);
+    const pd = dirOf(p.side);
+    let x = pd > 0 ? Math.min(p.bx, mid - 1) : Math.max(p.bx, mid + 1);
     let y = p.by;
-    if (p.side !== side && Math.hypot(x - mid, y - 34) < 10) x = mid - d * 10.5; // outside the centre circle
+    if (Math.hypot(x - mid, y - 34) < CIRCLE_R + 0.6) {
+      // Step back out of the circle, staying in our own half
+      const r = CIRCLE_R + 0.8;
+      let ang = Math.atan2(y - 34, x - mid);
+      if (Math.abs(y - 34) < 0.5 && Math.abs(x - mid) < 0.5) ang = pd > 0 ? Math.PI : 0;
+      x = mid + Math.cos(ang) * r; y = 34 + Math.sin(ang) * r;
+      x = pd > 0 ? Math.min(x, mid - 0.5) : Math.max(x, mid + 0.5);
+      if (Math.hypot(x - mid, y - 34) < r) y = 34 + Math.sign(y - 34 || 1) * Math.sqrt(r * r - (x - mid) ** 2);
+    }
     p.x = x; p.y = y; p.cool = 0; p.dx = p.dy = undefined;
   }
-  const d = dirOf(side);
-  const [taker, partner] = squadList(side).filter(p => p.pos !== "GK").sort((a, b) => d * (b.bx - a.bx));
   taker.x = mid - d * 0.6; taker.y = 34;
-  if (partner) { partner.x = mid - d * 1.5; partner.y = 40; }
+  receiver.x = mid - d * (CIRCLE_R + 0.6); receiver.y = 34;
   Object.assign(state.ball, { x: mid, y: 34, vx: 0, vy: 0 });
   giveBall(taker);
-  match.decide = 0.6;
+  match.kickoffTo = receiver;
+  match.decide = 0.7;
 }
 
 function giveBall(p) {
@@ -334,6 +352,7 @@ function carrierThink(dt) {
   const c = match.owner;
   if ((match.decide -= dt) > 0) return;
   match.decide = 0.25 + Math.random() * 0.3;
+  if (match.kickoffTo) { const to = match.kickoffTo; match.kickoffTo = null; return pass(c, to); }
   const d = dirOf(c.side), opp = squadList(otherSide(c.side)), mates = squadList(c.side).filter(p => p !== c);
   const gx = goalX(c.side), toGoal = Math.hypot(gx - c.x, 34 - c.y);
   const pressure = Math.min(...opp.map(o => dist(o, c)));
