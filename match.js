@@ -495,11 +495,21 @@ function drawCountdown() {
     t.classList.remove("pop"); void t.getBBox(); if (n) t.classList.add("pop");
   }
 }
+// Tiredness thresholds for the marker over a player's shirt
+const TIRING = 55, EXHAUSTED = 35;
 function sync() {
   drawCountdown();
   for (const p of everyone()) {
     const n = kitNodes.get(p.id);
-    if (n) { n.g.setAttribute("transform", place(p)); setFacing(p); }
+    if (!n) continue;
+    n.g.setAttribute("transform", place(p)); setFacing(p);
+    const e = p.energy ?? 100;
+    const mood = !match.active ? "" : e <= EXHAUSTED ? "exhausted" : e <= TIRING ? "tiring" : "";
+    if (mood !== n.mood) {
+      n.mood = mood;
+      n.tired.style.display = mood ? "" : "none";
+      n.tired.setAttribute("class", "tired " + mood);
+    }
   }
   if (ballNode) ballNode.setAttribute("transform", place(state.ball));
 }
