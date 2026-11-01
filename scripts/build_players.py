@@ -29,11 +29,12 @@ def main():
                 row["position"].strip(),
                 row["other_positions"].strip(),
                 int(row["overall"]),
+                row["preferred_foot"].strip()[:1].upper(),  # "L" or "R"
             ])
     for club in clubs.values():
         club["players"].sort(key=lambda p: -p[6])
     data = {
-        "fields": ["id", "shirtName", "name", "number", "position", "otherPositions", "overall"],
+        "fields": ["id", "shirtName", "name", "number", "position", "otherPositions", "overall", "foot"],
         "clubs": dict(sorted(clubs.items())),
     }
     OUT.write_text(

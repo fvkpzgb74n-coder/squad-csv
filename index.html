@@ -201,8 +201,8 @@ const SLOT_FIT = {
   RW: ["RW", "RM"], LW: ["LW", "LM"], ST: ["ST", "CF"],
 };
 const POS_ORDER = ["GK", "RB", "RWB", "CB", "LB", "LWB", "CDM", "CM", "CAM", "RM", "LM", "RW", "LW", "CF", "ST"];
-const squadOf = club => (DB.clubs[club]?.players || []).map(([pid, name, full, num, pos, other, ovr]) =>
-  ({ pid, name, full, num, natural: pos, other: other ? other.split(" ") : [], ovr }));
+const squadOf = club => (DB.clubs[club]?.players || []).map(([pid, name, full, num, pos, other, ovr, foot]) =>
+  ({ pid, name, full, num, natural: pos, other: other ? other.split(" ") : [], ovr, foot }));
 
 // How well a player suits a slot: their rating, less a penalty for playing out of position
 function fitScore(pl, slot) {
@@ -225,6 +225,12 @@ function pickXI(squad, formation) {
     if (score === -Infinity || chosen[si] || used.has(pi)) continue;
     chosen[si] = squad[pi]; used.add(pi);
   }
+  // Put left-footed centre-backs on the left of the back line and right-footed ones on the right.
+  // Formation y runs from the team's left touchline (0) to its right (68).
+  const cbSlots = slots.map((s, i) => i).filter(i => slots[i] === "CB").sort((a, b) => FORMATIONS[formation][a][2] - FORMATIONS[formation][b][2]);
+  const footOrder = { L: 0, R: 2 }; // two-footed or unknown players fit in the middle
+  const cbs = cbSlots.map(i => chosen[i]).sort((a, b) => (footOrder[a?.foot] ?? 1) - (footOrder[b?.foot] ?? 1));
+  cbSlots.forEach((slot, k) => { chosen[slot] = cbs[k]; });
   return chosen;
 }
 function fromDb(pl) { return pl ? { pid: pl.pid, name: pl.name, full: pl.full, num: pl.num, ovr: pl.ovr } : {}; }
