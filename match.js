@@ -411,6 +411,9 @@ function carrierThink(dt) {
   const ownHalf = d * (c.x - ownGoalX(c.side)) < PITCH_L / 2;
   const pressed = pressure < 4;
   const progressWeight = (ownHalf ? 0.25 : 0.5) * (0.6 + tempo * 0.8); // ×1 at 50, more forward-minded when quicker
+  // Poor dribblers (centre-backs, holding players) look for the simple, short pass instead of carrying it
+  const dri = attr(c, "dribbling");
+  const keepItSimple = Math.max(0, (76 - dri) / 3);
   let best = null, bestScore = -Infinity;
   for (const m of mates) {
     const L = dist(c, m);
@@ -424,14 +427,20 @@ function carrierThink(dt) {
       + (lane < 1.5 ? -8 : 0) + (inBox ? 5 : 0) + Math.random() * 3;
     if (ownHalf && progress < -3 && space > 6 && pressed) score += 3 * (1.5 - tempo); // under pressure, a safe ball back; patient teams more so
     if (m.pos === "GK") score -= pressed ? 1 : 4; // the keeper is an outlet, mostly when pressed
+    if (L < 20 && lane > 2.5) score += keepItSimple; // a short, safe ball to a nearby teammate
     if (score > bestScore) { best = m; bestScore = score; }
   }
 
   const ahead = opp.filter(o => d * (o.x - c.x) > 0 && dist(o, c) < 10);
   const room = ahead.length ? Math.min(...ahead.map(o => dist(o, c))) : 10;
-  const dribble = c.pos === "GK" ? -100 : room * 1.2 + attr(c, "dribbling") / 25 + Math.random() * 4 - (pressure < 2 ? 4 : 0) - (ownHalf ? 3 : 0);
+  // Good dribblers want to carry it and take players on; poor ones would rather not
+  const flair = (dri - 68) / 3; // about +6 for a 86 dribbler, -4 for a 56
+  const dribble = c.pos === "GK" ? -100
+    : room * 1.2 + flair + Math.random() * 4 - (pressure < 2 ? 4 : 0) - (ownHalf ? 3 : 0);
 
-  if (best && (bestScore > dribble || pressure < 2.2)) return pass(c, best);
+  // Tightly marked, most players move it on; the best dribblers may still try to beat their man
+  const mustRelease = pressure < 2.2 && dri < 78;
+  if (best && (bestScore > dribble || mustRelease)) return pass(c, best);
   c.dx = clamp(c.x + d * 10, 1, PITCH_L - 1);
   c.dy = clamp(c.y + (34 - c.y) * 0.25 + gauss() * 3, 2, PITCH_W - 2);
 }
