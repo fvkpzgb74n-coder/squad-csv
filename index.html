@@ -18,7 +18,7 @@
   --home: #7a1e3c;          /* claret shirt */
   --home-sleeve: #9ccff0;   /* pale blue sleeves */
   --run: var(--home-sleeve);
-  --away: #5aa7ff;
+  --away: #f2c230;
   --chalk: rgba(255,255,255,.82);
   --grass-a: #2f7a45;
   --grass-b: #2b7040;
@@ -240,14 +240,14 @@ function render() {
   }
   renderSide();
 }
-// Pixel-art shirt, seen from behind. K outline, B kit colour, S sleeves, T trim (collar, cuffs, hem), H shine.
+// Pixel-art shirt, seen from behind. K outline, B kit colour, S sleeves, C cuffs, T trim (collar, cuffs, hem), H shine.
 const KIT_ART = [
   "....KKKKKKKK....",
   "..KKTTTTTTTTKK..",
-  ".KSBBBBBBBBBBSK.",
-  "KSSHBBBBBBBBBSSK",
-  "KSSBBBBBBBBBBSSK",
-  "KTTBBBBBBBBBBTTK",
+  ".KSSSBBBBBBSSSK.",
+  "KSSSSBBBBBBSSSSK",
+  "KSSSSBBBBBBSSSSK",
+  "KCCSSBBBBBBSSCCK",
   "KKKBBBBBBBBBBKKK",
   "..KHBBBBBBBBBK..",
   "..KBBBBBBBBBBK..",
@@ -261,7 +261,7 @@ const PX = .36, KIT_W = 16 * PX, KIT_H = 14 * PX;
 (function buildKitSymbol() {
   const sym = el("symbol", { id: "kit", viewBox: "0 0 16 14", "shape-rendering": "crispEdges" }, svg.querySelector("defs"));
   // Each layer merges runs of matching pixels into one rect so no seams show between pixels
-  const layers = [["BTH", "currentColor"], ["S", "var(--sleeve, currentColor)"], ["T", "rgba(0,0,0,.32)"], ["H", "rgba(255,255,255,.45)"], ["K", "#14110f"]];
+  const layers = [["BTH", "currentColor"], ["SC", "var(--sleeve, currentColor)"], ["TC", "rgba(0,0,0,.32)"], ["H", "rgba(255,255,255,.45)"], ["K", "#14110f"]];
   for (const [chars, fill] of layers) KIT_ART.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
       if (!chars.includes(row[x])) continue;
@@ -280,7 +280,7 @@ function drawPlayer(p) {
   el("use", { href: "#kit", x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, g);
   el("use", { href: "#kit", x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, g);
   const t = el("text", { y: 1.35, "text-anchor": "middle", "font-size": p.num.length > 1 ? 1.45 : 1.75,
-    fill: home ? "var(--home-sleeve)" : "#fff", "font-family": "'Press Start 2P', monospace" }, g);
+    fill: home ? "var(--home-sleeve)" : "#14110f", "font-family": "'Press Start 2P', monospace" }, g);
   t.textContent = p.num;
   const lt = el("text", { y: KIT_H / 2 + 2, "text-anchor": "middle", "font-size": 1.5, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .4, "paint-order": "stroke" }, g);
