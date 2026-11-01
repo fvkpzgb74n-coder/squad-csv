@@ -60,10 +60,12 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; }
 #editor[hidden] { display: none; }
 .roster { display: grid; gap: 3px; font-size: 13px; }
-.roster div { display: grid; grid-template-columns: 26px 1fr auto; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
+.roster div { display: grid; grid-template-columns: 26px 1fr auto 24px; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
 .roster div:hover, .roster div.sel { background: var(--bg); }
 .roster .num { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
 .roster .pos { color: var(--muted); font-size: 11px; }
+.roster .ovr { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+#bench { max-height: 260px; overflow-y: auto; }
 .player { cursor: grab; }
 .player.dragging { cursor: grabbing; }
 .player text { pointer-events: none; }
@@ -135,14 +137,14 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
     <h2><span class="team-pill" style="background:linear-gradient(90deg,var(--home-sleeve) 0 25%,var(--home) 25% 75%,var(--home-sleeve) 75%)"></span>Your team</h2>
     <div class="row">
       <div><label for="home-formation">Formation</label><select id="home-formation"></select></div>
-      <div><label for="home-name">Name</label><input type="text" id="home-name" value="Riverside FC"></div>
+      <div><label for="home-club">Club</label><input type="text" id="home-club" list="club-list" autocomplete="off" placeholder="Search clubs"></div>
     </div>
   </section>
   <section>
     <h2><span class="team-pill" style="background:var(--away)"></span>Opposition</h2>
     <div class="row">
       <div><label for="away-formation">Formation</label><select id="away-formation"></select></div>
-      <div><label for="away-name">Name</label><input type="text" id="away-name" value="Opposition"></div>
+      <div><label for="away-club">Club</label><input type="text" id="away-club" list="club-list" autocomplete="off" placeholder="Search clubs"></div>
     </div>
   </section>
   <section id="editor" hidden>
@@ -154,9 +156,15 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
     <div style="margin-top:8px"><label for="ed-name">Name</label><input type="text" id="ed-name" maxlength="20"></div>
   </section>
   <section>
-    <h2>Line-up</h2>
+    <h2 id="lineup-title">Line-up</h2>
     <div class="roster" id="roster"></div>
   </section>
+  <section>
+    <h2 id="bench-title">Bench</h2>
+    <p class="hint" id="bench-hint">Select a player on the pitch, then tap a sub to bring them on.</p>
+    <div class="roster" id="bench"></div>
+  </section>
+  <datalist id="club-list"></datalist>
   <section>
     <h2>Board</h2>
     <div class="toolbar">
@@ -166,10 +174,11 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
       <button id="reset">Reset</button>
     </div>
   </section>
-  <p class="hint">Drag players and the ball. Pick an arrow tool, then drag on the pitch to draw: solid white for passes, dashed for runs. Click a player to rename them.</p>
+  <p class="hint">Drag players and the ball. Pick an arrow tool, then drag on the pitch to draw: solid white for passes, dashed for runs. Pick a club to load its best XI for the formation. Click a player to edit them or swap them with a sub.</p>
 </aside>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="players.js"></script>
 <script>
 // Formations: [pos, x, y] for a team attacking left→right, x 0..105, y 0..68
 const FORMATIONS = {
@@ -182,6 +191,43 @@ const FORMATIONS = {
   "4-1-4-1": [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["DM",28,34],["RM",38,58],["CM",37,42],["CM",37,26],["LM",38,10],["ST",50,34]],
 };
 const HOME_NAMES = ["Okafor","Reid","Santos","Kowalski","Mensah","Lindqvist","Duarte","Haddad","Moreau","Tanaka","Byrne"];
+const DB = window.PLAYERS_DB || { clubs: {} };
+const DEFAULT_CLUBS = { home: "Aston Villa", away: "Arsenal" };
+
+// Which database positions suit each formation slot, best fit first
+const SLOT_FIT = {
+  GK: ["GK"], CB: ["CB"], RB: ["RB", "RWB"], LB: ["LB", "LWB"], RWB: ["RWB", "RB", "RM"], LWB: ["LWB", "LB", "LM"],
+  DM: ["CDM", "CM"], CM: ["CM", "CDM", "CAM"], AM: ["CAM", "CM", "CF"], RM: ["RM", "RW"], LM: ["LM", "LW"],
+  RW: ["RW", "RM"], LW: ["LW", "LM"], ST: ["ST", "CF"],
+};
+const POS_ORDER = ["GK", "RB", "RWB", "CB", "LB", "LWB", "CDM", "CM", "CAM", "RM", "LM", "RW", "LW", "CF", "ST"];
+const squadOf = club => (DB.clubs[club]?.players || []).map(([pid, name, full, num, pos, other, ovr]) =>
+  ({ pid, name, full, num, natural: pos, other: other ? other.split(" ") : [], ovr }));
+
+// How well a player suits a slot: their rating, less a penalty for playing out of position
+function fitScore(pl, slot) {
+  const fits = SLOT_FIT[slot] || [slot];
+  if ((slot === "GK") !== (pl.natural === "GK")) return -Infinity; // keepers only in goal
+  if (pl.natural === fits[0]) return pl.ovr;
+  if (fits.includes(pl.natural)) return pl.ovr - 1;
+  if (pl.other.includes(fits[0])) return pl.ovr - 2;
+  if (fits.some(f => pl.other.includes(f))) return pl.ovr - 3;
+  return pl.ovr - 12;
+}
+// Best XI for a formation: take the strongest player–slot pairings first until every slot is filled
+function pickXI(squad, formation) {
+  const slots = FORMATIONS[formation].map(([pos]) => pos);
+  const pairs = [];
+  slots.forEach((slot, si) => squad.forEach((pl, pi) => pairs.push([fitScore(pl, slot), si, pi])));
+  pairs.sort((a, b) => b[0] - a[0]);
+  const chosen = new Array(slots.length).fill(null), used = new Set();
+  for (const [score, si, pi] of pairs) {
+    if (score === -Infinity || chosen[si] || used.has(pi)) continue;
+    chosen[si] = squad[pi]; used.add(pi);
+  }
+  return chosen;
+}
+function fromDb(pl) { return pl ? { pid: pl.pid, name: pl.name, full: pl.full, num: pl.num, ovr: pl.ovr } : {}; }
 const svg = document.getElementById("pitch");
 const gPlayers = document.getElementById("players");
 const gArrows = document.getElementById("arrows");
@@ -202,12 +248,27 @@ function freshState() {
     ball: { x: 54.5, y: 37 }, arrows: [], showAway: true, showBall: true,
   };
 }
+function startingState() {
+  state = freshState();
+  for (const side of ["home", "away"]) if (DB.clubs[DEFAULT_CLUBS[side]]) loadClub(side, DEFAULT_CLUBS[side]);
+  return state;
+}
 function applyFormation(side, formation) {
   const team = state[side];
   const fresh = buildTeam(side, formation);
-  team.players = fresh.map((p, i) => ({ ...p, name: team.players[i]?.name || "", num: team.players[i]?.num || p.num }));
+  if (team.club && DB.clubs[team.club]) {
+    const xi = pickXI(squadOf(team.club), formation);
+    team.players = fresh.map((p, i) => ({ ...p, ...fromDb(xi[i]) }));
+  } else {
+    team.players = fresh.map((p, i) => ({ ...p, name: team.players[i]?.name || "", num: team.players[i]?.num || p.num }));
+  }
   team.formation = formation;
   render();
+}
+function loadClub(side, club) {
+  state[side].club = club; state[side].name = club;
+  selected = null;
+  applyFormation(side, state[side].formation);
 }
 
 function el(tag, attrs, parent) {
@@ -453,7 +514,6 @@ function select(id) {
   document.getElementById("ed-num").value = p.num;
   document.getElementById("ed-pos").value = p.pos;
   document.getElementById("ed-name").value = p.name;
-  document.getElementById("ed-name").focus();
 }
 function findPlayer(id) { return [...state.home.players, ...state.away.players].find(p => p.id === id); }
 for (const [field, key] of [["ed-num","num"],["ed-pos","pos"],["ed-name","name"]]) {
@@ -463,26 +523,58 @@ for (const [field, key] of [["ed-num","num"],["ed-pos","pos"],["ed-name","name"]
   });
 }
 
+function rosterRow(num, name, pos, ovr, isSel, onClick) {
+  const d = document.createElement("div"); if (isSel) d.className = "sel";
+  d.innerHTML = `<span class="num"></span><span class="nm"></span><span class="pos"></span><span class="ovr"></span>`;
+  d.querySelector(".num").textContent = num;
+  d.querySelector(".nm").textContent = name || "—";
+  d.querySelector(".pos").textContent = pos;
+  d.querySelector(".ovr").textContent = ovr ?? "";
+  d.addEventListener("click", onClick);
+  return d;
+}
+const avgOvr = team => {
+  const r = team.players.map(p => p.ovr).filter(Boolean);
+  return r.length ? Math.round(r.reduce((a, b) => a + b, 0) / r.length) : null;
+};
 function renderSide() {
+  // Show the line-up and bench of the selected player's team, or your team when nothing is selected
+  const side = findPlayer(selected)?.side || "home", team = state[side];
+  document.getElementById("lineup-title").textContent = `Line-up · ${team.name}`;
   const r = document.getElementById("roster"); r.replaceChildren();
-  for (const p of state.home.players) {
-    const d = document.createElement("div"); if (p.id === selected) d.className = "sel";
-    d.innerHTML = `<span class="num"></span><span class="nm"></span><span class="pos"></span>`;
-    d.querySelector(".num").textContent = p.num;
-    d.querySelector(".nm").textContent = p.name || "—";
-    d.querySelector(".pos").textContent = p.pos;
-    d.addEventListener("click", () => select(p.id));
-    r.appendChild(d);
-  }
+  for (const p of team.players) r.appendChild(rosterRow(p.num, p.full || p.name, p.pos, p.ovr, p.id === selected, () => select(p.id)));
+
+  const bench = document.getElementById("bench"); bench.replaceChildren();
+  const onPitch = new Set(team.players.map(p => p.pid));
+  const subs = team.club ? squadOf(team.club).filter(pl => !onPitch.has(pl.pid))
+    .sort((a, b) => POS_ORDER.indexOf(a.natural) - POS_ORDER.indexOf(b.natural) || b.ovr - a.ovr) : [];
+  document.getElementById("bench-title").textContent = `Bench · ${subs.length}`;
+  document.getElementById("bench-hint").textContent = !team.club ? "Pick a club above to fill the bench."
+    : selected ? "Tap a sub to bring them on for the selected player." : "Select a player on the pitch, then tap a sub to bring them on.";
+  for (const pl of subs) bench.appendChild(rosterRow(pl.num, pl.full, pl.natural, pl.ovr, false, () => substitute(pl)));
   if (!selected) document.getElementById("editor").hidden = true;
-  document.getElementById("summary").textContent =
-    `${state.home.name} ${state.home.formation}` + (state.showAway ? `  vs  ${state.away.name} ${state.away.formation}` : "");
+  const label = t => `${t.name} ${t.formation}` + (avgOvr(t) ? ` (${avgOvr(t)})` : "");
+  document.getElementById("summary").textContent = label(state.home) + (state.showAway ? `  vs  ${label(state.away)}` : "");
   document.getElementById("home-formation").value = state.home.formation;
   document.getElementById("away-formation").value = state.away.formation;
-  document.getElementById("home-name").value = state.home.name;
-  document.getElementById("away-name").value = state.away.name;
+  for (const s of ["home", "away"]) {
+    const box = document.getElementById(s + "-club");
+    if (document.activeElement !== box) box.value = state[s].club || state[s].name;
+  }
   document.getElementById("toggle-away").setAttribute("aria-pressed", state.showAway);
   document.getElementById("toggle-ball").setAttribute("aria-pressed", state.showBall);
+}
+
+function substitute(pl) {
+  const out = findPlayer(selected);
+  if (!out) { toast("Select a player on the pitch first"); return; }
+  Object.assign(out, fromDb(pl));
+  toast(`${pl.name} on for the ${out.pos}`);
+  render(); select(out.id);
+}
+{ // club search list
+  const list = document.getElementById("club-list");
+  for (const [club, info] of Object.entries(DB.clubs)) list.appendChild(new Option(info.league, club));
 }
 
 // Controls
@@ -490,7 +582,11 @@ for (const side of ["home","away"]) {
   const s = document.getElementById(side + "-formation");
   for (const f of Object.keys(FORMATIONS)) s.add(new Option(f, f));
   s.addEventListener("change", e => applyFormation(side, e.target.value));
-  document.getElementById(side + "-name").addEventListener("input", e => { state[side].name = e.target.value; renderSide(); });
+  document.getElementById(side + "-club").addEventListener("change", e => {
+    const club = e.target.value.trim();
+    if (DB.clubs[club]) { loadClub(side, club); toast(`${club} loaded`); e.target.blur(); }
+    else if (club) toast(`No club called "${club}". Pick one from the list.`);
+  });
 }
 const tools = { move: "tool-move", pass: "tool-pass", run: "tool-run" };
 for (const [t, id] of Object.entries(tools)) document.getElementById(id).addEventListener("click", () => {
@@ -501,7 +597,7 @@ document.getElementById("undo-arrow").onclick = () => { state.arrows.pop(); rend
 document.getElementById("clear-arrows").onclick = () => { state.arrows = []; render(); };
 document.getElementById("toggle-away").onclick = () => { state.showAway = !state.showAway; render(); };
 document.getElementById("toggle-ball").onclick = () => { state.showBall = !state.showBall; render(); };
-document.getElementById("reset").onclick = () => { state = freshState(); selected = null; render(); toast("Board reset"); };
+document.getElementById("reset").onclick = () => { state = startingState(); selected = null; render(); toast("Board reset"); };
 document.getElementById("save").onclick = () => {
   try { localStorage.setItem("tactics-board", JSON.stringify(state)); toast("Saved in this browser"); }
   catch { toast("Saving isn't available here"); }
@@ -521,7 +617,7 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
 }
 
-state = freshState();
+startingState();
 render();
 </script>
 </body>
