@@ -19,6 +19,8 @@
   --home-sleeve: #9ccff0;   /* pale blue sleeves */
   --run: var(--home-sleeve);
   --away: #f2c230;
+  --home-gk: #3a3d46;       /* goalkeeper kits */
+  --away-gk: #e2507f;
   --chalk: rgba(255,255,255,.82);
   --grass-a: #2f7a45;
   --grass-b: #2b7040;
@@ -382,12 +384,12 @@ function updateFacings() { for (const side of ["home", "away"]) state[side].play
 
 function drawPlayer(p) {
   const g = el("g", { class: "player", transform: place(p), tabindex: 0, role: "button", "aria-label": `${p.num} ${p.name || p.pos}` }, gPlayers);
-  const home = p.side === "home";
+  const home = p.side === "home", keeper = p.pos === "GK";
   if (selected === p.id) el("rect", { x: -KIT_W / 2 - .7, y: -KIT_H / 2 - .7, width: KIT_W + 1.4, height: KIT_H + 1.4, fill: "none",
     stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, g);
   const shadow = el("use", { x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, g);
-  const kit = el("use", { x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, g);
-  const num = el("text", { "text-anchor": "middle", fill: home ? "#fff" : "#14110f", "font-family": "'Press Start 2P', monospace" }, g);
+  const kit = el("use", { x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: keeper ? `color:var(--${p.side}-gk)` : `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, g);
+  const num = el("text", { "text-anchor": "middle", fill: home || keeper ? "#fff" : "#14110f", "font-family": "'Press Start 2P', monospace" }, g);
   num.textContent = p.num;
   const lt = el("text", { y: KIT_H / 2 + 2, "text-anchor": "middle", "font-size": 1.5, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .4, "paint-order": "stroke" }, g);
