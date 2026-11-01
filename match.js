@@ -75,6 +75,7 @@ function endMatch() {
     state.showAway = s.showAway; state.showBall = s.showBall; state.ball = { ...s.ball };
   }
   gArrows.style.display = "";
+  clearPuffs();
   drawCountdown();
   render();
   updateMatchUI();
@@ -495,22 +496,67 @@ function drawCountdown() {
     t.classList.remove("pop"); void t.getBBox(); if (n) t.classList.add("pop");
   }
 }
-// Tiredness thresholds for the marker over a player's shirt
-const TIRING = 55, EXHAUSTED = 35;
+// Breath puffs: tired players puff out little pixel clouds from the top right of their shirt.
+// Puffs start below 70% stamina and grow bigger and more frequent as the player tires.
+const BREATH_FROM = 70, BREATH_FULL = 25;  // stamina where puffs start, and where they are at their most
+const PUFF_LIFE = 900;                     // ms a puff takes to drift away and fade
+const PUFF_ART = [ // W white, S soft shade, O grey outline so the puff reads on grass
+  "..OOO..",
+  ".OWWWO.",
+  "OWWWWSO",
+  "OWWWSSO",
+  ".OSSSO.",
+  "..OOO..",
+];
+const puffs = [];
+function puffSymbol() {
+  if (document.getElementById("px-puff")) return;
+  const NS = "http://www.w3.org/2000/svg", sym = document.createElementNS(NS, "symbol");
+  sym.id = "px-puff"; sym.setAttribute("viewBox", "0 0 7 6"); sym.setAttribute("shape-rendering", "crispEdges");
+  PUFF_ART.forEach((row, y) => [...row].forEach((ch, x) => {
+    const fill = { W: "#ffffff", S: "#d4dbe8", O: "#7d8aa3" }[ch];
+    if (!fill) return;
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1.02); r.setAttribute("height", 1.02);
+    r.setAttribute("fill", fill); sym.appendChild(r);
+  }));
+  document.querySelector("#pitch defs").appendChild(sym);
+}
+function breathe(now) {
+  const layer = document.getElementById("puffs");
+  puffSymbol();
+  for (const p of everyone()) {
+    const e = p.energy ?? 100;
+    if (e > BREATH_FROM) { p.nextPuff = null; continue; }
+    const t = clamp((BREATH_FROM - e) / (BREATH_FROM - BREATH_FULL), 0, 1); // 0 = just tiring, 1 = exhausted
+    const every = (1.8 - t * 1.45) * 1000;                                  // 1.8s down to 0.35s between puffs
+    if (p.nextPuff == null) p.nextPuff = now + Math.random() * every;
+    if (now < p.nextPuff) continue;
+    p.nextPuff = now + every * (0.8 + Math.random() * 0.4);
+    // top-right corner of the shirt, in screen coordinates
+    const x = p.y + KIT_W * ICON_SCALE / 2 - 0.3, y = PITCH_L - p.x - KIT_H * ICON_SCALE / 2 + 0.3;
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    el.setAttribute("href", "#px-puff"); el.setAttribute("width", 1.4); el.setAttribute("height", 1.2);
+    layer.appendChild(el);
+    puffs.push({ el, born: now, x, y, size: 0.9 + t * 1.1 }); // up to about twice the size when exhausted
+  }
+  for (let i = puffs.length - 1; i >= 0; i--) {
+    const f = puffs[i], age = (now - f.born) / PUFF_LIFE;
+    if (age >= 1) { f.el.remove(); puffs.splice(i, 1); continue; }
+    const s = f.size * (0.6 + age * 0.7);
+    f.el.setAttribute("transform", `translate(${f.x + age * 1.3} ${f.y - age * 1.5}) scale(${s})`);
+    f.el.setAttribute("opacity", (age < 0.4 ? 1 : 1 - (age - 0.4) / 0.6).toFixed(2)); // solid, then fade
+  }
+}
+function clearPuffs() { for (const f of puffs) f.el.remove(); puffs.length = 0; for (const p of everyone()) p.nextPuff = null; }
+
 function sync() {
   drawCountdown();
   for (const p of everyone()) {
     const n = kitNodes.get(p.id);
-    if (!n) continue;
-    n.g.setAttribute("transform", place(p)); setFacing(p);
-    const e = p.energy ?? 100;
-    const mood = !match.active ? "" : e <= EXHAUSTED ? "exhausted" : e <= TIRING ? "tiring" : "";
-    if (mood !== n.mood) {
-      n.mood = mood;
-      n.tired.style.display = mood ? "" : "none";
-      n.tired.setAttribute("class", "tired " + mood);
-    }
+    if (n) { n.g.setAttribute("transform", place(p)); setFacing(p); }
   }
+  if (match.active && match.running) breathe(performance.now());
   if (ballNode) ballNode.setAttribute("transform", place(state.ball));
 }
 

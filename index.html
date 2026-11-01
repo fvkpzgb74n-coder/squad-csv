@@ -166,11 +166,6 @@ aside h2.right { text-align: right; }
 }
 #countdown.pop { animation: countdown-pop .9s ease-out both; }
 @keyframes countdown-pop { 0% { transform: scale(1.7); opacity: 0; } 25% { opacity: 1; } 100% { transform: scale(1); opacity: .78; } }
-/* Tiredness marker: chunky pixel hash with a black outline, tilted and pulsing */
-.player .tired { stroke: #000; stroke-width: .3px; paint-order: stroke; transform-box: fill-box; transform-origin: center; animation: fret 1s ease-in-out infinite; }
-.player .tired.tiring { fill: #f28c35; }
-.player .tired.exhausted { fill: #e5484d; animation-duration: .6s; }
-@keyframes fret { 0%, 100% { transform: rotate(-14deg) scale(1); } 50% { transform: rotate(-6deg) scale(1.18); } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -241,6 +236,7 @@ aside h2.right { text-align: right; }
       <g id="arrows"></g>
       </g>
       <g id="players"></g>
+      <g id="puffs" pointer-events="none"></g>
     </svg>
   </div>
 </main>
@@ -643,12 +639,7 @@ function drawPlayer(p) {
   const lt = el("text", { y: KIT_H * ICON_SCALE / 2 + 1.5, "text-anchor": "middle", "font-size": 1.15, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .35, "paint-order": "stroke" }, g);
   lt.textContent = (knownAs(p.name) || p.pos).toUpperCase();
-  // Exasperated "#" beside the shirt: orange when tiring, red when exhausted (shown during matches)
-  const tired = el("text", { class: "tired", x: KIT_W * ICON_SCALE / 2 + 0.1, y: -KIT_H * ICON_SCALE / 2 - 0.1,
-    "text-anchor": "middle", "font-size": 1.2, "font-family": "'Press Start 2P', monospace" }, g);
-  tired.textContent = "#";
-  tired.style.display = "none";
-  kitNodes.set(p.id, { g, shadow, kit, num, tired, mood: "", dir: null });
+  kitNodes.set(p.id, { g, shadow, kit, num, dir: null });
   setFacing(p);
   makeDraggable(g, p);
   g.addEventListener("keydown", e => { if (e.key === "Enter") select(p.id); });
