@@ -12,6 +12,16 @@ SRC = ROOT / "data" / "players.csv"
 OUT = ROOT / "players.js"
 
 
+ATTRIBUTES = ["pace", "shooting", "passing", "dribbling", "defending", "physical"]
+
+
+def as_int(value):
+    try:
+        return int(value)
+    except ValueError:
+        return 0
+
+
 def shirt_name(row):
     return (row["shirt_name"] or row["last_name"] or row["name"]).strip()
 
@@ -30,11 +40,12 @@ def main():
                 row["other_positions"].strip(),
                 int(row["overall"]),
                 row["preferred_foot"].strip()[:1].upper(),  # "L" or "R"
+                *(as_int(row[k]) for k in ATTRIBUTES),
             ])
     for club in clubs.values():
         club["players"].sort(key=lambda p: -p[6])
     data = {
-        "fields": ["id", "shirtName", "name", "number", "position", "otherPositions", "overall", "foot"],
+        "fields": ["id", "shirtName", "name", "number", "position", "otherPositions", "overall", "foot", "pace", "shooting", "passing", "dribbling", "defending", "physical"],
         "clubs": dict(sorted(clubs.items())),
     }
     OUT.write_text(

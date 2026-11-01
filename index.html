@@ -53,6 +53,10 @@ button {
   padding: 7px 11px; font: inherit; font-weight: 500; cursor: pointer;
 }
 button:hover { border-color: var(--muted); }
+button.primary { background: var(--home-sleeve); color: #0f1612; border-color: var(--home-sleeve); font-weight: 600; }
+button:disabled { opacity: .4; cursor: default; }
+.events { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 180px; overflow-y: auto; font-size: 13px; color: var(--muted); }
+.events li.big { color: var(--ink); font-weight: 600; }
 button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 :focus-visible { outline: 2px solid var(--home-sleeve); outline-offset: 2px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -92,6 +96,9 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
     <button id="clear-arrows">Clear arrows</button>
     <button id="toggle-away" aria-pressed="true">Show opposition</button>
     <button id="toggle-ball" aria-pressed="true">Show ball</button>
+    <button id="kickoff" class="primary">Kick off</button>
+    <button id="speed" hidden>Speed 1×</button>
+    <button id="end-match" hidden>End match</button>
   </div>
   <div class="pitch-wrap">
     <svg id="pitch" viewBox="-4 -4 76 113" aria-label="Football pitch, 68 by 105 metres, your team attacking upwards">
@@ -133,6 +140,10 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 </main>
 
 <aside>
+  <section id="match-panel" hidden>
+    <h2>Match</h2>
+    <ol class="events" id="events"></ol>
+  </section>
   <section>
     <h2><span class="team-pill" style="background:linear-gradient(90deg,var(--home-sleeve) 0 25%,var(--home) 25% 75%,var(--home-sleeve) 75%)"></span>Your team</h2>
     <div class="row">
@@ -174,7 +185,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
       <button id="reset">Reset</button>
     </div>
   </section>
-  <p class="hint">Drag players and the ball. Pick an arrow tool, then drag on the pitch to draw: solid white for passes, dashed for runs. Pick a club to load its best XI for the formation. Click a player to edit them or swap them with a sub.</p>
+  <p class="hint">Drag players and the ball. Pick an arrow tool, then drag on the pitch to draw: solid white for passes, dashed for runs. Pick a club to load its best XI for the formation. Click a player to edit them or swap them with a sub. Press Kick off to watch the two line-ups play a match.</p>
 </aside>
 <div class="toast" id="toast" role="status"></div>
 
@@ -201,8 +212,8 @@ const SLOT_FIT = {
   RW: ["RW", "RM"], LW: ["LW", "LM"], ST: ["ST", "CF"],
 };
 const POS_ORDER = ["GK", "RB", "RWB", "CB", "LB", "LWB", "CDM", "CM", "CAM", "RM", "LM", "RW", "LW", "CF", "ST"];
-const squadOf = club => (DB.clubs[club]?.players || []).map(([pid, name, full, num, pos, other, ovr, foot]) =>
-  ({ pid, name, full, num, natural: pos, other: other ? other.split(" ") : [], ovr, foot }));
+const squadOf = club => (DB.clubs[club]?.players || []).map(([pid, name, full, num, pos, other, ovr, foot, pace, shooting, passing, dribbling, defending, physical]) =>
+  ({ pid, name, full, num, natural: pos, other: other ? other.split(" ") : [], ovr, foot, pace, shooting, passing, dribbling, defending, physical }));
 
 // How well a player suits a slot: their rating, less a penalty for playing out of position
 function fitScore(pl, slot) {
@@ -233,13 +244,20 @@ function pickXI(squad, formation) {
   cbSlots.forEach((slot, k) => { chosen[slot] = cbs[k]; });
   return chosen;
 }
-function fromDb(pl) { return pl ? { pid: pl.pid, name: pl.name, full: pl.full, num: pl.num, ovr: pl.ovr } : {}; }
+const RATINGS = ["ovr", "pace", "shooting", "passing", "dribbling", "defending", "physical"];
+function fromDb(pl) {
+  if (!pl) return {};
+  const out = { pid: pl.pid, name: pl.name, full: pl.full, num: pl.num };
+  for (const k of RATINGS) out[k] = pl[k];
+  return out;
+}
 const svg = document.getElementById("pitch");
 const gPlayers = document.getElementById("players");
 const gArrows = document.getElementById("arrows");
 const NS = "http://www.w3.org/2000/svg";
 
 let state, tool = "move", selected = null;
+let ballNode = null, matchActive = false; // set by render() and match.js
 
 function buildTeam(side, formation, names) {
   return FORMATIONS[formation].map(([pos, x, y], i) => ({
@@ -260,6 +278,7 @@ function startingState() {
   return state;
 }
 function applyFormation(side, formation) {
+  if (matchActive) endMatch();
   const team = state[side];
   const fresh = buildTeam(side, formation);
   if (team.club && DB.clubs[team.club]) {
@@ -293,7 +312,7 @@ function toPitch(evt) {
 const place = o => `translate(${o.y} ${105 - o.x})`;
 
 function render() {
-  kitNodes.clear();
+  kitNodes.clear(); ballNode = null;
   gPlayers.replaceChildren(); gArrows.replaceChildren();
   for (const a of state.arrows) {
     el("line", { x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2,
@@ -303,7 +322,7 @@ function render() {
   const teams = state.showAway ? ["away", "home"] : ["home"];
   for (const side of teams) for (const p of state[side].players) drawPlayer(p);
   if (state.showBall) {
-    const b = el("g", { class: "player", transform: place(state.ball) }, gPlayers);
+    const b = ballNode = el("g", { class: "player", transform: place(state.ball) }, gPlayers);
     el("circle", { r: 1, fill: "#fff", stroke: "#111", "stroke-width": .2 }, b);
     el("circle", { r: .35, fill: "#111" }, b);
     makeDraggable(b, state.ball);
@@ -465,7 +484,7 @@ function drawPlayer(p) {
   const lt = el("text", { y: KIT_H * ICON_SCALE / 2 + 1.5, "text-anchor": "middle", "font-size": 1.15, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .35, "paint-order": "stroke" }, g);
   lt.textContent = (p.name || p.pos).toUpperCase();
-  kitNodes.set(p.id, { shadow, kit, num, dir: null });
+  kitNodes.set(p.id, { g, shadow, kit, num, dir: null });
   setFacing(p);
   makeDraggable(g, p);
   g.addEventListener("keydown", e => { if (e.key === "Enter") select(p.id); });
@@ -473,7 +492,7 @@ function drawPlayer(p) {
 
 function makeDraggable(g, obj) {
   g.addEventListener("pointerdown", e => {
-    if (tool !== "move") return;
+    if (tool !== "move" || matchActive) return;
     e.stopPropagation(); g.setPointerCapture(e.pointerId); g.classList.add("dragging");
     const start = toPitch(e), ox = obj.x, oy = obj.y; let moved = false;
     const move = ev => {
@@ -494,6 +513,7 @@ function makeDraggable(g, obj) {
 // Arrow drawing
 let draft = null;
 svg.addEventListener("pointerdown", e => {
+  if (matchActive) return;
   if (tool === "move") { if (selected) { selected = null; render(); } return; }
   svg.setPointerCapture(e.pointerId);
   const p = toPitch(e);
@@ -514,6 +534,7 @@ svg.addEventListener("pointerup", () => {
 });
 
 function select(id) {
+  if (matchActive) return;
   selected = id; render();
   const p = findPlayer(id); if (!p) return;
   document.getElementById("editor").hidden = false;
@@ -603,12 +624,13 @@ document.getElementById("undo-arrow").onclick = () => { state.arrows.pop(); rend
 document.getElementById("clear-arrows").onclick = () => { state.arrows = []; render(); };
 document.getElementById("toggle-away").onclick = () => { state.showAway = !state.showAway; render(); };
 document.getElementById("toggle-ball").onclick = () => { state.showBall = !state.showBall; render(); };
-document.getElementById("reset").onclick = () => { state = startingState(); selected = null; render(); toast("Board reset"); };
+document.getElementById("reset").onclick = () => { if (matchActive) endMatch(); state = startingState(); selected = null; render(); toast("Board reset"); };
 document.getElementById("save").onclick = () => {
   try { localStorage.setItem("tactics-board", JSON.stringify(state)); toast("Saved in this browser"); }
   catch { toast("Saving isn't available here"); }
 };
 document.getElementById("load").onclick = () => {
+  if (matchActive) endMatch();
   try { const s = JSON.parse(localStorage.getItem("tactics-board")); if (s) { state = s; selected = null; render(); toast("Loaded"); } else toast("Nothing saved yet"); }
   catch { toast("Loading isn't available here"); }
 };
@@ -626,5 +648,6 @@ function toast(msg) {
 startingState();
 render();
 </script>
+<script src="match.js"></script>
 </body>
 </html>

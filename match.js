@@ -1,0 +1,430 @@
+// Match simulation for the tactics board.
+// Both sides play automatically from the positions on the board and the players' ratings.
+// Model coordinates: x runs 0..105 along the pitch (home attacks towards 105), y runs 0..68 across.
+// Uses globals from index.html: state, render, setFacing, place, kitNodes, ballNode, gArrows, toast.
+
+const PITCH_L = 105, PITCH_W = 68, GOAL_HALF = 3.66;
+const CLOCK_RATE = 22.5; // match seconds per simulated second: 90 minutes take about 4 minutes at 1×
+const STEP = 1 / 60;
+const BALL_DRAG = 0.75, SHOT_DRAG = 0.25;
+const SHOOT_RANGE = 30; // metres from goal where players start looking to shoot
+// The match is a fast highlights reel: 90 minutes pass in about 4, so teams play more directly than real life // how quickly a rolling ball slows down (per second)
+
+const match = { active: false, running: false, speed: 1 };
+
+const dirOf = side => (side === "home" ? 1 : -1);
+const goalX = side => (side === "home" ? PITCH_L : 0); // the goal a side attacks
+const ownGoalX = side => (side === "home" ? 0 : PITCH_L);
+const otherSide = side => (side === "home" ? "away" : "home");
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 0.5; // roughly normal, mean 0, sd 1
+const squadList = side => state[side].players;
+const everyone = () => [...state.home.players, ...state.away.players];
+const keeperOf = side => squadList(side).find(p => p.pos === "GK") || squadList(side)[0];
+const attr = (p, key) => p[key] || p.ovr || 60;
+const minute = () => Math.min(90, Math.floor(match.clock / 60) + 1);
+
+function segDist(p, a, b) { // distance from point p to the segment a–b
+  const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+  const t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / L2, 0, 1);
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+// ---------- match flow ----------
+function startMatch() {
+  if (selected) selected = null;
+  match.saved = {
+    showAway: state.showAway, showBall: state.showBall, ball: { x: state.ball.x, y: state.ball.y },
+    positions: everyone().map(p => [p, p.x, p.y]),
+  };
+  state.showAway = state.showBall = true;
+  for (const p of everyone()) { p.bx = p.x; p.by = p.y; p.cool = 0; }
+  Object.assign(match, {
+    active: true, running: true, over: false, clock: 0, half: 1,
+    score: { home: 0, away: 0 }, shots: { home: 0, away: 0 }, possTime: { home: 0, away: 0 },
+    events: [], owner: null, poss: null, passTo: null, shot: null, lastTouch: null, lastPlayer: null,
+    noTouch: null, pause: 0, then: null, decide: 0, firstKick: Math.random() < 0.5 ? "home" : "away",
+  });
+  matchActive = true;
+  render();
+  gArrows.style.display = "none";
+  kickoff(match.firstKick);
+  addEvent(`Kick-off. ${state[match.firstKick].name} get us started.`);
+  updateMatchUI();
+  match.last = null;
+  requestAnimationFrame(loop);
+}
+
+function endMatch() {
+  match.active = match.running = false;
+  matchActive = false;
+  const s = match.saved;
+  if (s) {
+    for (const [p, x, y] of s.positions) { p.x = x; p.y = y; }
+    state.showAway = s.showAway; state.showBall = s.showBall; state.ball = { ...s.ball };
+  }
+  gArrows.style.display = "";
+  render();
+  updateMatchUI();
+}
+
+function loop(ts) {
+  if (!match.active) return;
+  if (match.running) {
+    const elapsed = match.last == null ? 0 : Math.min(0.1, (ts - match.last) / 1000);
+    match.acc = (match.acc || 0) + elapsed * match.speed;
+    while (match.acc >= STEP && match.running) { step(STEP); match.acc -= STEP; }
+    sync();
+    if ((match.frame = (match.frame || 0) + 1) % 6 === 0) updateMatchUI();
+  }
+  match.last = ts;
+  requestAnimationFrame(loop);
+}
+
+function step(dt) {
+  if (match.pause > 0) { // a restart is being set up: the clock stops and players drift back into shape
+    movePlayers(dt);
+    match.pause -= dt;
+    if (match.pause <= 0 && match.then) { const f = match.then; match.then = null; f(); }
+    return;
+  }
+  match.clock += dt * CLOCK_RATE;
+  if (match.half === 1 && match.clock >= 45 * 60) return halfTime();
+  if (match.clock >= 90 * 60) return fullTime();
+  if (match.poss) match.possTime[match.poss] += dt;
+  if (match.noTouch && (match.noTouch.t -= dt) <= 0) match.noTouch = null;
+  moveBall(dt);
+  if (checkBall()) return;
+  movePlayers(dt);
+  if (match.owner) carrierThink(dt); else pickups();
+  tackles(dt);
+}
+
+function restart(delay, fn) { match.owner = null; match.passTo = null; match.shot = null; match.pause = delay; match.then = fn; }
+
+function halfTime() {
+  match.half = 2; match.clock = 45 * 60;
+  addEvent(`Half time: ${scoreLine()}.`);
+  restart(3, () => kickoff(otherSide(match.firstKick)));
+}
+
+function fullTime() {
+  match.clock = 90 * 60; match.running = false; match.over = true;
+  match.owner = null; state.ball.vx = state.ball.vy = 0;
+  addEvent(`Full time: ${scoreLine()}.`);
+  updateMatchUI();
+}
+
+const scoreLine = () => `${state.home.name} ${match.score.home}–${match.score.away} ${state.away.name}`;
+
+function kickoff(side) {
+  const mid = PITCH_L / 2;
+  for (const p of everyone()) {
+    const d = dirOf(p.side);
+    let x = d > 0 ? Math.min(p.bx, mid - 1) : Math.max(p.bx, mid + 1);
+    let y = p.by;
+    if (p.side !== side && Math.hypot(x - mid, y - 34) < 10) x = mid - d * 10.5; // outside the centre circle
+    p.x = x; p.y = y; p.cool = 0; p.dx = p.dy = undefined;
+  }
+  const d = dirOf(side);
+  const [taker, partner] = squadList(side).filter(p => p.pos !== "GK").sort((a, b) => d * (b.bx - a.bx));
+  taker.x = mid - d * 0.6; taker.y = 34;
+  if (partner) { partner.x = mid - d * 1.5; partner.y = 40; }
+  Object.assign(state.ball, { x: mid, y: 34, vx: 0, vy: 0 });
+  giveBall(taker);
+  match.decide = 0.6;
+}
+
+function giveBall(p) {
+  match.owner = p; match.poss = p.side; match.lastTouch = p.side; match.lastPlayer = p;
+  match.passTo = null; match.shot = null;
+  state.ball.vx = state.ball.vy = 0;
+  p.dx = p.dy = undefined;
+  match.decide = 0.25 + Math.random() * 0.3;
+}
+
+function release(p) {
+  match.owner = null; match.lastTouch = p.side; match.lastPlayer = p;
+  match.noTouch = { p, t: 0.3 };
+}
+
+// ---------- ball ----------
+function moveBall(dt) {
+  const b = state.ball;
+  if (match.owner) {
+    const o = match.owner, d = dirOf(o.side);
+    b.x = clamp(o.x + d * 0.9, 0.2, PITCH_L - 0.2); b.y = o.y;
+    return;
+  }
+  b.x += b.vx * dt; b.y += b.vy * dt;
+  const f = Math.exp(-(match.shot ? SHOT_DRAG : BALL_DRAG) * dt);
+  b.vx *= f; b.vy *= f;
+  if (Math.hypot(b.vx, b.vy) < 0.3) { b.vx = b.vy = 0; if (!match.shot) match.passTo = null; }
+}
+
+// Goals, saves and the ball going out of play. Returns true when play stops.
+function checkBall() {
+  const b = state.ball;
+  const s = match.shot;
+  if (s && !s.resolved && Math.abs(b.x - goalX(s.side)) < 2.2) {
+    s.resolved = true;
+    if (Math.abs(b.y - 34) < GOAL_HALF) {
+      const gk = keeperOf(otherSide(s.side));
+      const save = clamp(0.55 + (attr(gk, "ovr") - 70) / 60 - (attr(s.by, "shooting") - 70) / 90 + (s.dist - 16) / 60, 0.15, 0.92);
+      if (Math.random() < save) {
+        addEvent(`${minute()}' Save! ${gk.name} keeps out ${s.by.name}.`);
+        gk.x = goalX(s.side) - dirOf(s.side) * 1.5; gk.y = clamp(b.y, 31, 37);
+        giveBall(gk);
+        restart(1, () => giveBall(gk));
+        return true;
+      }
+    }
+  }
+  if (b.x < 0 || b.x > PITCH_L) {
+    const attackers = b.x > PITCH_L ? "home" : "away"; // the side attacking that goal
+    if (Math.abs(b.y - 34) < GOAL_HALF) goal(attackers);
+    else {
+      if (match.shot) addEvent(`${minute()}' ${match.shot.by.name} shoots wide.`);
+      if (match.lastTouch === attackers) goalKick(otherSide(attackers)); else corner(attackers, b.y < 34 ? 0.5 : PITCH_W - 0.5);
+    }
+    return true;
+  }
+  if (b.y < 0 || b.y > PITCH_W) { throwIn(otherSide(match.lastTouch), clamp(b.x, 1, PITCH_L - 1), b.y < 0 ? 0.5 : PITCH_W - 0.5); return true; }
+  return false;
+}
+
+function goal(side) {
+  match.score[side]++;
+  const scorer = match.lastPlayer;
+  const ownGoal = scorer && scorer.side !== side;
+  addEvent(`${minute()}' GOAL! ${scorer ? scorer.name : "Scrambled in"}${ownGoal ? " (own goal)" : ""} for ${state[side].name}. ${scoreLine()}.`, true);
+  const b = state.ball; b.vx = b.vy = 0; b.x = clamp(b.x, -1.5, PITCH_L + 1.5);
+  restart(2.5, () => kickoff(otherSide(side)));
+}
+
+function goalKick(side) {
+  restart(1.2, () => {
+    const gk = keeperOf(side);
+    gk.x = ownGoalX(side) + dirOf(side) * 5.5; gk.y = 34;
+    Object.assign(state.ball, { x: gk.x, y: gk.y });
+    giveBall(gk);
+  });
+}
+
+function corner(side, y) {
+  addEvent(`${minute()}' Corner to ${state[side].name}.`);
+  restart(1.2, () => {
+    const spot = { x: goalX(side) - dirOf(side) * 0.5, y };
+    const taker = squadList(side).filter(p => p.pos !== "GK").sort((a, b) => dist(a, spot) - dist(b, spot))[0];
+    taker.x = spot.x; taker.y = spot.y;
+    giveBall(taker);
+    match.decide = 0.5;
+  });
+}
+
+function throwIn(side, x, y) {
+  restart(0.8, () => {
+    const spot = { x, y };
+    const taker = squadList(side).filter(p => p.pos !== "GK").sort((a, b) => dist(a, spot) - dist(b, spot))[0];
+    taker.x = x; taker.y = y;
+    giveBall(taker);
+  });
+}
+
+// ---------- players ----------
+function movePlayers(dt) {
+  const b = state.ball;
+  for (const side of ["home", "away"]) {
+    const d = dirOf(side), list = squadList(side), attacking = match.poss === side;
+    const outfield = list.filter(p => p.pos !== "GK" && p !== match.owner);
+    outfield.sort((p, q) => dist(p, b) - dist(q, b));
+    const [chaser, cover] = outfield;
+    const chase = match.pause <= 0 && !match.shot && (!attacking || (!match.owner && !match.passTo));
+    for (const p of list) {
+      let tx, ty, sprint = false;
+      if (p === match.owner) {
+        tx = p.dx ?? p.x + d * 3; ty = p.dy ?? p.y;
+      } else if (p.pos === "GK") {
+        tx = ownGoalX(side) + d * (attacking ? 9 : 2.5);
+        ty = 34 + (b.y - 34) * 0.25;
+      } else if (p === match.passTo && match.pause <= 0) {
+        // Run onto the line of the pass
+        const v = Math.hypot(b.vx, b.vy) || 1, ux = b.vx / v, uy = b.vy / v;
+        const along = clamp((p.x - b.x) * ux + (p.y - b.y) * uy, 0, v / BALL_DRAG);
+        tx = b.x + ux * along; ty = b.y + uy * along; sprint = true;
+      } else if (chase && p === chaser) {
+        tx = b.x; ty = b.y; sprint = true;
+      } else if (!attacking && p === cover && match.pause <= 0) {
+        tx = b.x - d * 6; ty = b.y + (34 - b.y) * 0.3; // sit between the ball and our goal
+      } else {
+        // Team shape: the board position, shifted with the ball and pushed up when we have it
+        const shift = (b.x - PITCH_L / 2) * 0.5 + d * (attacking ? 13 : -3);
+        tx = p.bx + shift; ty = p.by + (b.y - 34) * 0.35;
+        if (attacking && d * (p.bx - PITCH_L / 2) > -8) { // forwards make runs
+          tx += d * 9; ty += Math.sin(match.clock / 40 + p.bx * 7) * 5;
+        }
+        tx = d > 0 ? clamp(tx, 6, PITCH_L - 3) : clamp(tx, 3, PITCH_L - 6);
+      }
+      const pace = attr(p, "pace");
+      const speed = (4.2 + pace * 0.042) * (sprint ? 1 : 0.8) * (p === match.owner ? 0.85 : 1) * (match.pause > 0 ? 0.6 : 1);
+      const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy);
+      if (L > 0.2) { const m = Math.min(L, speed * dt); p.x += (dx / L) * m; p.y += (dy / L) * m; }
+    }
+    // Keep teammates from bunching on top of each other
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], c = list[j], gap = dist(a, c);
+      if (gap > 0 && gap < 2.5) {
+        const push = ((2.5 - gap) / gap) * 0.5 * dt * 4;
+        if (a !== match.owner) { a.x -= (c.x - a.x) * push; a.y -= (c.y - a.y) * push; }
+        if (c !== match.owner) { c.x += (c.x - a.x) * push; c.y += (c.y - a.y) * push; }
+      }
+    }
+    for (const p of list) { p.x = clamp(p.x, 0.5, PITCH_L - 0.5); p.y = clamp(p.y, 0.5, PITCH_W - 0.5); }
+  }
+}
+
+// A loose ball goes to whoever reaches it first; fast passes are harder to cut out
+function pickups() {
+  const b = state.ball, speed = Math.hypot(b.vx, b.vy);
+  let best = null, bestD = 1.4;
+  for (const p of everyone()) {
+    if (match.noTouch && match.noTouch.p === p) continue;
+    const d = dist(p, b);
+    if (d > 1.4) continue;
+    let chance = 1;
+    if (match.shot) chance = p.pos === "GK" ? 0 : 0.06; // outfield blocks; keepers are handled at the line
+    else if (match.passTo && p.side !== match.passTo.side) {
+      // Each opponent gets one go at cutting out a pass, as it reaches them
+      if (match.passTried.has(p)) continue;
+      match.passTried.add(p);
+      const def = attr(p, "defending") / 100;
+      chance = speed > 10 ? 0.05 + def * def * 0.35 : 0.55;
+    }
+    if (Math.random() < chance && d < bestD) { best = p; bestD = d; }
+  }
+  if (!best) return;
+  if (match.shot && best.side !== match.shot.side) addEvent(`${minute()}' Blocked by ${best.name}.`);
+  giveBall(best);
+}
+
+function tackles(dt) {
+  const c = match.owner;
+  for (const p of everyone()) p.cool = Math.max(0, (p.cool || 0) - dt);
+  if (!c) return;
+  for (const o of squadList(otherSide(c.side))) {
+    if (o.cool > 0 || dist(o, c) > 1.6) continue;
+    o.cool = 0.6;
+    const win = clamp(0.35 * (attr(o, "defending") / attr(c, "dribbling")) ** 2, 0.05, 0.75);
+    if (Math.random() < win) { giveBall(o); c.cool = 0.8; return; }
+  }
+}
+
+// ---------- decisions on the ball ----------
+function carrierThink(dt) {
+  const c = match.owner;
+  if ((match.decide -= dt) > 0) return;
+  match.decide = 0.25 + Math.random() * 0.3;
+  const d = dirOf(c.side), opp = squadList(otherSide(c.side)), mates = squadList(c.side).filter(p => p !== c);
+  const gx = goalX(c.side), toGoal = Math.hypot(gx - c.x, 34 - c.y);
+  const pressure = Math.min(...opp.map(o => dist(o, c)));
+
+  if (toGoal < SHOOT_RANGE && Math.abs(34 - c.y) < 22 && c.pos !== "GK") {
+    const keen = ((SHOOT_RANGE - toGoal) / SHOOT_RANGE) * 1.1 + (pressure < 3 ? 0.2 : 0) + (attr(c, "shooting") - 60) / 250;
+    if (Math.random() < keen) return shoot(c);
+  }
+
+  let best = null, bestScore = -Infinity;
+  for (const m of mates) {
+    const L = dist(c, m);
+    if (L < 4 || L > 45) continue;
+    if (m.pos === "GK" && Math.abs(c.x - ownGoalX(c.side)) > 30) continue;
+    const progress = d * (m.x - c.x);
+    const lane = Math.min(...opp.map(o => segDist(o, c, m)));
+    const space = Math.min(...opp.map(o => dist(o, m)));
+    const inBox = Math.abs(gx - m.x) < 16 && Math.abs(m.y - 34) < 20;
+    const score = progress * 0.6 + Math.min(space, 8) + Math.min(lane, 5) * 1.6 - L * 0.08
+      + (lane < 1.5 ? -8 : 0) + (inBox ? 5 : 0) + Math.random() * 3;
+    if (score > bestScore) { best = m; bestScore = score; }
+  }
+
+  const ahead = opp.filter(o => d * (o.x - c.x) > 0 && dist(o, c) < 10);
+  const room = ahead.length ? Math.min(...ahead.map(o => dist(o, c))) : 10;
+  const dribble = c.pos === "GK" ? -100 : room * 1.2 + attr(c, "dribbling") / 25 + Math.random() * 4 - (pressure < 2 ? 4 : 0);
+
+  if (best && (bestScore > dribble || pressure < 2.2)) return pass(c, best);
+  c.dx = clamp(c.x + d * 10, 1, PITCH_L - 1);
+  c.dy = clamp(c.y + (34 - c.y) * 0.25 + gauss() * 3, 2, PITCH_W - 2);
+}
+
+function pass(c, m) {
+  const b = state.ball, L = dist(c, m);
+  const err = gauss() * (1 - attr(c, "passing") / 100) * 0.35; // radians off target: better passers are more accurate
+  const ang = Math.atan2(m.y - c.y, m.x + dirOf(c.side) * 1.5 - c.x) + err;
+  const v = Math.min(30, L * BALL_DRAG * 1.15 + 4);
+  release(c);
+  b.vx = Math.cos(ang) * v; b.vy = Math.sin(ang) * v;
+  match.passTo = m;
+  match.passTried = new Set();
+}
+
+function shoot(c) {
+  const b = state.ball, gx = goalX(c.side);
+  const aimY = 34 + (Math.random() * 2 - 1) * (GOAL_HALF - 0.6);
+  const L = Math.hypot(gx - c.x, aimY - c.y);
+  const miss = gauss() * ((100 - attr(c, "shooting")) / 100) * (3 + L * 0.18); // metres wide of the aim
+  const ang = Math.atan2(aimY + miss - c.y, gx - c.x);
+  const v = 24 + attr(c, "shooting") / 12;
+  release(c);
+  b.vx = Math.cos(ang) * v; b.vy = Math.sin(ang) * v;
+  match.shot = { side: c.side, by: c, dist: L, resolved: false };
+  match.shots[c.side]++;
+}
+
+// ---------- drawing and panel ----------
+function sync() {
+  for (const p of everyone()) {
+    const n = kitNodes.get(p.id);
+    if (n) { n.g.setAttribute("transform", place(p)); setFacing(p); }
+  }
+  if (ballNode) ballNode.setAttribute("transform", place(state.ball));
+}
+
+function addEvent(text, big) {
+  match.events.unshift({ text, big });
+  const list = document.getElementById("events");
+  const li = document.createElement("li");
+  li.textContent = text;
+  if (big) li.className = "big";
+  list.prepend(li);
+  if (big) toast(text.replace(/^\d+' /, ""));
+}
+
+function updateMatchUI() {
+  const on = match.active;
+  document.getElementById("kickoff").textContent = !on ? "Kick off" : match.over ? "Full time" : match.running ? "Pause" : "Resume";
+  document.getElementById("kickoff").disabled = on && match.over;
+  document.getElementById("speed").hidden = !on;
+  document.getElementById("speed").textContent = `Speed ${match.speed}×`;
+  document.getElementById("end-match").hidden = !on;
+  document.getElementById("end-match").textContent = match.over ? "Back to board" : "End match";
+  document.getElementById("match-panel").hidden = !on && !match.events?.length;
+  for (const id of ["tool-pass", "tool-run", "undo-arrow", "clear-arrows", "toggle-away", "toggle-ball"]) document.getElementById(id).disabled = on;
+  if (!on) { if (!match.events?.length) document.getElementById("events").replaceChildren(); return; }
+  const total = match.possTime.home + match.possTime.away || 1;
+  const pct = Math.round((match.possTime.home / total) * 100);
+  const clock = match.over ? "FT" : match.pause > 0 && match.half === 2 && match.clock === 45 * 60 ? "HT" : `${minute()}'`;
+  document.getElementById("summary").textContent =
+    `${scoreLine()} · ${clock} · Possession ${pct}–${100 - pct} · Shots ${match.shots.home}–${match.shots.away}`;
+}
+
+document.getElementById("kickoff").addEventListener("click", () => {
+  if (!match.active) startMatch();
+  else if (!match.over) { match.running = !match.running; match.last = null; updateMatchUI(); }
+});
+document.getElementById("speed").addEventListener("click", () => {
+  match.speed = match.speed === 4 ? 1 : match.speed * 2; updateMatchUI();
+});
+document.getElementById("end-match").addEventListener("click", () => {
+  match.events = []; endMatch();
+});
