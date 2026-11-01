@@ -92,12 +92,10 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card .stars.gold { color: #f6c84a; }
 .card .stars.silver { color: #c9d1d8; }
 .card .stars.bronze { color: #cf8a4e; }
-/* 8-bit stamina bar: ten square blocks inside a black frame */
-.card .stamina {
-  display: grid; grid-template-columns: repeat(10, 1fr); gap: 1px; width: 50px; height: 14px; padding: 2px;
-  background: #000; border: 1px solid #000; box-shadow: 0 0 0 1px #2a2f55;
-}
-.card .stamina i { display: block; background: #1a1d36; }
+/* 8-bit stamina bar: one solid bar inside a square black frame */
+.card .stamina { display: block; width: 50px; height: 14px; padding: 2px; background: #000; box-shadow: 0 0 0 1px #2a2f55; }
+.card .stamina i { display: block; height: 100%; background: #1a1d36; }
+.card .stamina i b { display: block; height: 100%; width: 100%; }
 .card .nm { font-size: 22px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .pos { color: var(--muted); font-size: 17px; }
 #bench .card { background: transparent; }
@@ -711,7 +709,8 @@ function paintStamina(card, energy) {
   if (bar.dataset.step === String(step)) return;
   bar.dataset.step = step;
   const colour = STAMINA_COLOURS.find(([min]) => step >= min)[1];
-  [...bar.children].forEach((block, i) => { block.style.background = i < step / 10 ? colour : ""; });
+  const fill = bar.querySelector("b");
+  fill.style.width = `${step}%`; fill.style.background = colour;
   bar.title = `Stamina ${step}%`;
 }
 function updateStaminaBars() {
@@ -728,7 +727,7 @@ function playerCard(num, name, pos, ovr, opts) {
   d.querySelector(".nm").textContent = name || "—";
   d.querySelector(".pos").textContent = pos;
   if (opts.kind === "xi") {
-    d.insertAdjacentHTML("beforeend", `<span class="stamina">${"<i></i>".repeat(10)}</span>`);
+    d.insertAdjacentHTML("beforeend", `<span class="stamina"><i><b></b></i></span>`);
     paintStamina(d, opts.energy ?? 100);
   }
   makeCardDraggable(d, opts.onTap);
