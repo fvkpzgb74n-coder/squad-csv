@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tactics Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: pitch fills the left, a slim control rail on the right; stacks on phones. Single dark "floodlit stadium" world. */
+:root {
+  --bg: #0f1612;
+  --panel: #18221c;
+  --line: #2b3a30;
+  --ink: #e9efe9;
+  --muted: #93a598;
+  --home: #f2b632;
+  --away: #5aa7ff;
+  --chalk: rgba(255,255,255,.82);
+  --grass-a: #2f7a45;
+  --grass-b: #2b7040;
+  --font-display: "Oswald", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px;
+  display: grid; grid-template-columns: 1fr 300px; gap: 16px; padding: 16px;
+}
+main { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: .04em; text-transform: uppercase; margin: 0; }
+.score { color: var(--muted); font-variant-numeric: tabular-nums; }
+.toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
+.pitch-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 110px); touch-action: none; user-select: none; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.45); }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+aside h2 { font-family: var(--font-display); font-weight: 500; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+select, input[type=text] {
+  width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 5px;
+  padding: 7px 8px; font: inherit;
+}
+button {
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 5px;
+  padding: 7px 11px; font: inherit; font-weight: 500; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+:focus-visible { outline: 2px solid var(--home); outline-offset: 2px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.team-pill { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; }
+#editor[hidden] { display: none; }
+.roster { display: grid; gap: 3px; font-size: 13px; }
+.roster div { display: grid; grid-template-columns: 26px 1fr auto; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
+.roster div:hover, .roster div.sel { background: var(--bg); }
+.roster .num { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+.roster .pos { color: var(--muted); font-size: 11px; }
+.player { cursor: grab; }
+.player.dragging { cursor: grabbing; }
+.player text { pointer-events: none; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 5px; font-weight: 500; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+@media (max-width: 820px) {
+  body { grid-template-columns: 1fr; height: auto; }
+  svg#pitch { max-height: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Tactics Board</h1>
+    <span class="score" id="summary"></span>
+  </header>
+  <div class="toolbar" role="toolbar" aria-label="Tools">
+    <button id="tool-move" aria-pressed="true">Move</button>
+    <button id="tool-pass" aria-pressed="false">Pass arrow</button>
+    <button id="tool-run" aria-pressed="false">Run arrow</button>
+    <button id="undo-arrow">Undo arrow</button>
+    <button id="clear-arrows">Clear arrows</button>
+    <button id="toggle-away" aria-pressed="true">Show opposition</button>
+    <button id="toggle-ball" aria-pressed="true">Show ball</button>
+  </div>
+  <div class="pitch-wrap">
+    <svg id="pitch" viewBox="-4 -4 113 76" aria-label="Football pitch, 105 by 68 metres">
+      <defs>
+        <pattern id="stripes" width="10.5" height="68" patternUnits="userSpaceOnUse">
+          <rect width="5.25" height="68" fill="var(--grass-a)"/>
+          <rect x="5.25" width="5.25" height="68" fill="var(--grass-b)"/>
+        </pattern>
+        <marker id="head-pass" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#fff"/></marker>
+        <marker id="head-run" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--home)"/></marker>
+      </defs>
+      <rect x="-4" y="-4" width="113" height="76" fill="#25613a"/>
+      <rect width="105" height="68" fill="url(#stripes)"/>
+      <g fill="none" stroke="var(--chalk)" stroke-width=".25">
+        <rect width="105" height="68"/>
+        <line x1="52.5" y1="0" x2="52.5" y2="68"/>
+        <circle cx="52.5" cy="34" r="9.15"/>
+        <circle cx="52.5" cy="34" r=".4" fill="var(--chalk)"/>
+        <!-- penalty areas 16.5m deep, 40.32m wide -->
+        <rect x="0" y="13.84" width="16.5" height="40.32"/>
+        <rect x="88.5" y="13.84" width="16.5" height="40.32"/>
+        <rect x="0" y="24.84" width="5.5" height="18.32"/>
+        <rect x="99.5" y="24.84" width="5.5" height="18.32"/>
+        <circle cx="11" cy="34" r=".4" fill="var(--chalk)"/>
+        <circle cx="94" cy="34" r=".4" fill="var(--chalk)"/>
+        <path d="M16.5 26.69 A9.15 9.15 0 0 1 16.5 41.31"/>
+        <path d="M88.5 26.69 A9.15 9.15 0 0 0 88.5 41.31"/>
+        <rect x="-2" y="30.34" width="2" height="7.32"/>
+        <rect x="105" y="30.34" width="2" height="7.32"/>
+        <path d="M0 1 A1 1 0 0 0 1 0 M104 0 A1 1 0 0 0 105 1 M0 67 A1 1 0 0 1 1 68 M104 68 A1 1 0 0 1 105 67"/>
+      </g>
+      <g id="arrows"></g>
+      <g id="players"></g>
+    </svg>
+  </div>
+</main>
+
+<aside>
+  <section>
+    <h2><span class="team-pill" style="background:var(--home)"></span>Your team</h2>
+    <div class="row">
+      <div><label for="home-formation">Formation</label><select id="home-formation"></select></div>
+      <div><label for="home-name">Name</label><input type="text" id="home-name" value="Riverside FC"></div>
+    </div>
+  </section>
+  <section>
+    <h2><span class="team-pill" style="background:var(--away)"></span>Opposition</h2>
+    <div class="row">
+      <div><label for="away-formation">Formation</label><select id="away-formation"></select></div>
+      <div><label for="away-name">Name</label><input type="text" id="away-name" value="Opposition"></div>
+    </div>
+  </section>
+  <section id="editor" hidden>
+    <h2>Selected player</h2>
+    <div class="row">
+      <div><label for="ed-num">Number</label><input type="text" id="ed-num" maxlength="2"></div>
+      <div><label for="ed-pos">Position</label><input type="text" id="ed-pos" maxlength="4"></div>
+    </div>
+    <div style="margin-top:8px"><label for="ed-name">Name</label><input type="text" id="ed-name" maxlength="20"></div>
+  </section>
+  <section>
+    <h2>Line-up</h2>
+    <div class="roster" id="roster"></div>
+  </section>
+  <section>
+    <h2>Board</h2>
+    <div class="toolbar">
+      <button id="save">Save</button>
+      <button id="load">Load saved</button>
+      <button id="copy">Copy line-up</button>
+      <button id="reset">Reset</button>
+    </div>
+  </section>
+  <p class="hint">Drag players and the ball. Pick an arrow tool, then drag on the pitch to draw: solid white for passes, dashed for runs. Click a player to rename them.</p>
+</aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// Formations: [pos, x, y] for a team attacking left→right, x 0..105, y 0..68
+const FORMATIONS = {
+  "4-3-3":   [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["CM",36,46],["DM",31,34],["CM",36,22],["RW",48,58],["ST",50,34],["LW",48,10]],
+  "4-4-2":   [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["RM",36,58],["CM",34,40],["CM",34,28],["LM",36,10],["ST",48,40],["ST",48,28]],
+  "4-2-3-1": [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["DM",30,41],["DM",30,27],["RW",42,56],["AM",42,34],["LW",42,12],["ST",50,34]],
+  "3-5-2":   [["GK",5,34],["CB",18,46],["CB",16,34],["CB",18,22],["RWB",34,60],["CM",33,44],["DM",29,34],["CM",33,24],["LWB",34,8],["ST",48,40],["ST",48,28]],
+  "3-4-3":   [["GK",5,34],["CB",18,46],["CB",16,34],["CB",18,22],["RM",34,58],["CM",32,40],["CM",32,28],["LM",34,10],["RW",47,54],["ST",50,34],["LW",47,14]],
+  "5-3-2":   [["GK",5,34],["RWB",24,60],["CB",17,46],["CB",15,34],["CB",17,22],["LWB",24,8],["CM",33,46],["CM",31,34],["CM",33,22],["ST",46,40],["ST",46,28]],
+  "4-1-4-1": [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["DM",28,34],["RM",38,58],["CM",37,42],["CM",37,26],["LM",38,10],["ST",50,34]],
+};
+const HOME_NAMES = ["Okafor","Reid","Santos","Kowalski","Mensah","Lindqvist","Duarte","Haddad","Moreau","Tanaka","Byrne"];
+const svg = document.getElementById("pitch");
+const gPlayers = document.getElementById("players");
+const gArrows = document.getElementById("arrows");
+const NS = "http://www.w3.org/2000/svg";
+
+let state, tool = "move", selected = null;
+
+function buildTeam(side, formation, names) {
+  return FORMATIONS[formation].map(([pos, x, y], i) => ({
+    id: side + i, side, pos, num: String(i === 0 ? 1 : i + 1), name: names ? names[i] : "",
+    x: side === "home" ? x : 105 - x, y: side === "home" ? y : 68 - y,
+  }));
+}
+function freshState() {
+  return {
+    home: { name: "Riverside FC", formation: "4-3-3", players: buildTeam("home", "4-3-3", HOME_NAMES) },
+    away: { name: "Opposition", formation: "4-4-2", players: buildTeam("away", "4-4-2") },
+    ball: { x: 54.5, y: 37 }, arrows: [], showAway: true, showBall: true,
+  };
+}
+function applyFormation(side, formation) {
+  const team = state[side];
+  const fresh = buildTeam(side, formation);
+  team.players = fresh.map((p, i) => ({ ...p, name: team.players[i]?.name || "", num: team.players[i]?.num || p.num }));
+  team.formation = formation;
+  render();
+}
+
+function el(tag, attrs, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function toPitch(evt) {
+  const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: Math.max(-3, Math.min(108, p.x)), y: Math.max(-3, Math.min(71, p.y)) };
+}
+
+function render() {
+  gPlayers.replaceChildren(); gArrows.replaceChildren();
+  for (const a of state.arrows) {
+    el("line", { x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2,
+      stroke: a.type === "pass" ? "#fff" : "var(--home)", "stroke-width": .45,
+      "stroke-dasharray": a.type === "run" ? "1.2 .8" : "none", "marker-end": `url(#head-${a.type})`, "stroke-linecap": "round" }, gArrows);
+  }
+  const teams = state.showAway ? ["away", "home"] : ["home"];
+  for (const side of teams) for (const p of state[side].players) drawPlayer(p);
+  if (state.showBall) {
+    const b = el("g", { class: "player", transform: `translate(${state.ball.x} ${state.ball.y})` }, gPlayers);
+    el("circle", { r: 1, fill: "#fff", stroke: "#111", "stroke-width": .2 }, b);
+    el("circle", { r: .35, fill: "#111" }, b);
+    makeDraggable(b, state.ball);
+  }
+  renderSide();
+}
+function drawPlayer(p) {
+  const g = el("g", { class: "player", transform: `translate(${p.x} ${p.y})`, tabindex: 0, role: "button", "aria-label": `${p.num} ${p.name || p.pos}` }, gPlayers);
+  const col = p.side === "home" ? "var(--home)" : "var(--away)";
+  if (selected === p.id) el("circle", { r: 3, fill: "none", stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, g);
+  el("circle", { r: 2.1, fill: col, stroke: "#0b0f0c", "stroke-width": .3 }, g);
+  const t = el("text", { y: .75, "text-anchor": "middle", "font-size": 2.1, "font-weight": 600, fill: "#0b0f0c", "font-family": "IBM Plex Sans, sans-serif" }, g);
+  t.textContent = p.num;
+  const label = p.name || p.pos;
+  const lt = el("text", { y: 4.6, "text-anchor": "middle", "font-size": 1.7, fill: "#fff", "font-family": "IBM Plex Sans, sans-serif",
+    stroke: "rgba(0,0,0,.55)", "stroke-width": .35, "paint-order": "stroke" }, g);
+  lt.textContent = label;
+  makeDraggable(g, p);
+  g.addEventListener("keydown", e => { if (e.key === "Enter") select(p.id); });
+}
+
+function makeDraggable(g, obj) {
+  g.addEventListener("pointerdown", e => {
+    if (tool !== "move") return;
+    e.stopPropagation(); g.setPointerCapture(e.pointerId); g.classList.add("dragging");
+    const start = toPitch(e), ox = obj.x, oy = obj.y; let moved = false;
+    const move = ev => {
+      const p = toPitch(ev); obj.x = ox + p.x - start.x; obj.y = oy + p.y - start.y;
+      if (Math.hypot(p.x - start.x, p.y - start.y) > .4) moved = true;
+      g.setAttribute("transform", `translate(${obj.x} ${obj.y})`);
+    };
+    const up = () => {
+      g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up);
+      g.classList.remove("dragging");
+      if (!moved && obj.id) select(obj.id); else render();
+    };
+    g.addEventListener("pointermove", move); g.addEventListener("pointerup", up);
+  });
+}
+
+// Arrow drawing
+let draft = null;
+svg.addEventListener("pointerdown", e => {
+  if (tool === "move") { if (selected) { selected = null; render(); } return; }
+  svg.setPointerCapture(e.pointerId);
+  const p = toPitch(e);
+  draft = { type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+  draft.node = el("line", { x1: p.x, y1: p.y, x2: p.x, y2: p.y, stroke: tool === "pass" ? "#fff" : "var(--home)", "stroke-width": .45,
+    "stroke-dasharray": tool === "run" ? "1.2 .8" : "none", "marker-end": `url(#head-${tool})`, opacity: .7 }, gArrows);
+});
+svg.addEventListener("pointermove", e => {
+  if (!draft) return;
+  const p = toPitch(e); draft.x2 = p.x; draft.y2 = p.y;
+  draft.node.setAttribute("x2", p.x); draft.node.setAttribute("y2", p.y);
+});
+svg.addEventListener("pointerup", () => {
+  if (!draft) return;
+  const { node, ...a } = draft; draft = null;
+  if (Math.hypot(a.x2 - a.x1, a.y2 - a.y1) > 2) state.arrows.push(a);
+  render();
+});
+
+function select(id) {
+  selected = id; render();
+  const p = findPlayer(id); if (!p) return;
+  document.getElementById("editor").hidden = false;
+  document.getElementById("ed-num").value = p.num;
+  document.getElementById("ed-pos").value = p.pos;
+  document.getElementById("ed-name").value = p.name;
+  document.getElementById("ed-name").focus();
+}
+function findPlayer(id) { return [...state.home.players, ...state.away.players].find(p => p.id === id); }
+for (const [field, key] of [["ed-num","num"],["ed-pos","pos"],["ed-name","name"]]) {
+  document.getElementById(field).addEventListener("input", e => {
+    const p = findPlayer(selected); if (!p) return;
+    p[key] = key === "pos" ? e.target.value.toUpperCase() : e.target.value; render();
+  });
+}
+
+function renderSide() {
+  const r = document.getElementById("roster"); r.replaceChildren();
+  for (const p of state.home.players) {
+    const d = document.createElement("div"); if (p.id === selected) d.className = "sel";
+    d.innerHTML = `<span class="num"></span><span class="nm"></span><span class="pos"></span>`;
+    d.querySelector(".num").textContent = p.num;
+    d.querySelector(".nm").textContent = p.name || "—";
+    d.querySelector(".pos").textContent = p.pos;
+    d.addEventListener("click", () => select(p.id));
+    r.appendChild(d);
+  }
+  if (!selected) document.getElementById("editor").hidden = true;
+  document.getElementById("summary").textContent =
+    `${state.home.name} ${state.home.formation}` + (state.showAway ? `  vs  ${state.away.name} ${state.away.formation}` : "");
+  document.getElementById("home-formation").value = state.home.formation;
+  document.getElementById("away-formation").value = state.away.formation;
+  document.getElementById("home-name").value = state.home.name;
+  document.getElementById("away-name").value = state.away.name;
+  document.getElementById("toggle-away").setAttribute("aria-pressed", state.showAway);
+  document.getElementById("toggle-ball").setAttribute("aria-pressed", state.showBall);
+}
+
+// Controls
+for (const side of ["home","away"]) {
+  const s = document.getElementById(side + "-formation");
+  for (const f of Object.keys(FORMATIONS)) s.add(new Option(f, f));
+  s.addEventListener("change", e => applyFormation(side, e.target.value));
+  document.getElementById(side + "-name").addEventListener("input", e => { state[side].name = e.target.value; renderSide(); });
+}
+const tools = { move: "tool-move", pass: "tool-pass", run: "tool-run" };
+for (const [t, id] of Object.entries(tools)) document.getElementById(id).addEventListener("click", () => {
+  tool = t; for (const [t2, id2] of Object.entries(tools)) document.getElementById(id2).setAttribute("aria-pressed", t === t2);
+  svg.style.cursor = t === "move" ? "" : "crosshair";
+});
+document.getElementById("undo-arrow").onclick = () => { state.arrows.pop(); render(); };
+document.getElementById("clear-arrows").onclick = () => { state.arrows = []; render(); };
+document.getElementById("toggle-away").onclick = () => { state.showAway = !state.showAway; render(); };
+document.getElementById("toggle-ball").onclick = () => { state.showBall = !state.showBall; render(); };
+document.getElementById("reset").onclick = () => { state = freshState(); selected = null; render(); toast("Board reset"); };
+document.getElementById("save").onclick = () => {
+  try { localStorage.setItem("tactics-board", JSON.stringify(state)); toast("Saved in this browser"); }
+  catch { toast("Saving isn't available here"); }
+};
+document.getElementById("load").onclick = () => {
+  try { const s = JSON.parse(localStorage.getItem("tactics-board")); if (s) { state = s; selected = null; render(); toast("Loaded"); } else toast("Nothing saved yet"); }
+  catch { toast("Loading isn't available here"); }
+};
+document.getElementById("copy").onclick = async () => {
+  const t = state.home;
+  const text = `${t.name} (${t.formation})\n` + t.players.map(p => `${p.num.padStart(2)}  ${p.pos.padEnd(4)} ${p.name}`).join("\n");
+  try { await navigator.clipboard.writeText(text); toast("Line-up copied"); } catch { toast("Copy was blocked by the browser"); }
+};
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+}
+
+state = freshState();
+// Example opening state: a couple of arrows showing a right-side overload
+state.arrows = [
+  { type: "pass", x1: 36, y1: 46, x2: 47, y2: 57 },
+  { type: "run", x1: 22, y1: 58, x2: 44, y2: 64 },
+];
+render();
+</script>
+</body>
+</html>
