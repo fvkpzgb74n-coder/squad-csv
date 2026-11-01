@@ -224,6 +224,7 @@ function toPitch(evt) {
 const place = o => `translate(${o.y} ${105 - o.x})`;
 
 function render() {
+  kitNodes.clear();
   gPlayers.replaceChildren(); gArrows.replaceChildren();
   for (const a of state.arrows) {
     el("line", { x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2,
@@ -240,51 +241,157 @@ function render() {
   }
   renderSide();
 }
-// Pixel-art shirt, seen from behind. K outline, B kit colour, S sleeves, C cuffs, T trim (collar, cuffs, hem), H shine.
-const KIT_ART = [
-  ".....KKKKKKKK.....",
-  "...KKTTTTTTTTKK...",
-  "..KSBBBBBBBBBBSK..",
-  ".KSSBBBBBBBBBBSSK.",
-  "KSSSBBBBBBBBBBSSSK",
-  "KCCSBBBBBBBBBBSCCK",
-  "KKKKBBBBBBBBBBKKKK",
-  "...KHBBBBBBBBBK...",
-  "...KBBBBBBBBBBK...",
-  "...KBBBBBBBBBBK...",
-  "...KBBBBBBBBBBK...",
-  "...KBBBBBBBBBBK...",
-  "...KTTTTTTTTTTK...",
-  "...KKKKKKKKKKKK...",
-]
+// Pixel-art shirts, one sprite per facing. K outline, B kit colour, S sleeves, C cuffs,
+// T trim (collar, hem), H shine, W badge. West-facing sprites are mirrors of east-facing ones.
+const KIT_SPRITES = {
+  N: [ // back of the shirt
+    ".....KKKKKKKK.....",
+    "...KKTTTTTTTTKK...",
+    "..KSBBBBBBBBBBSK..",
+    ".KSSBBBBBBBBBBSSK.",
+    "KSSSBBBBBBBBBBSSSK",
+    "KCCSBBBBBBBBBBSCCK",
+    "KKKKBBBBBBBBBBKKKK",
+    "...KHBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KTTTTTTTTTTK...",
+    "...KKKKKKKKKKKK...",
+  ],
+  NE: [ // back, turned three-quarters to the right
+    "......KKKKKKKK....",
+    "....KKTTTTTTTTK...",
+    "...KSBBBBBBBBBSK..",
+    "..KSSBBBBBBBBBSK..",
+    ".KSSSBBBBBBBBBSK..",
+    ".KCCSBBBBBBBBBCK..",
+    ".KKKKBBBBBBBBBKK..",
+    "....KHBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KTTTTTTTTTK...",
+    "....KKKKKKKKKKK...",
+  ],
+  E: [ // side on, facing right
+    "......KKKKKK......",
+    ".....KTTTTTTK.....",
+    "....KBBBBBBTTK....",
+    "....KBBBKSSSSK....",
+    "....KBBBKSSSSSK...",
+    "....KBBBBKSSSSK...",
+    "....KBBBBKCCCCK...",
+    "....KHBBBBKKKKK...",
+    "....KBBBBBBBBK....",
+    "....KBBBBBBBBK....",
+    "....KBBBBBBBBK....",
+    "....KBBBBBBBBK....",
+    "....KTTTTTTTTK....",
+    "....KKKKKKKKKK....",
+  ],
+  SE: [ // front, turned three-quarters to the right
+    "......KKKKKKKK....",
+    "....KKTTKKKKTTK...",
+    "...KSBBBBTKKTBSK..",
+    "..KSSBBBBBTTBBSK..",
+    ".KSSSBBBBBBBWBSK..",
+    ".KCCSBBBBBBBBBCK..",
+    ".KKKKBBBBBBBBBKK..",
+    "....KHBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KTTTTTTTTTK...",
+    "....KKKKKKKKKKK...",
+  ],
+  S: [ // front of the shirt: V-neck and badge
+    ".....KKKKKKKK.....",
+    "...KKTTKKKKTTKK...",
+    "..KSBBBTKKTBBBSK..",
+    ".KSSBBBBTTBBBBSSK.",
+    "KSSSBBBBBBBWBBSSSK",
+    "KCCSBBBBBBBBBBSCCK",
+    "KKKKBBBBBBBBBBKKKK",
+    "...KHBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KTTTTTTTTTTK...",
+    "...KKKKKKKKKKKK...",
+  ],
+};
+const mirror = rows => rows.map(r => [...r].reverse().join(""));
+KIT_SPRITES.W = mirror(KIT_SPRITES.E);
+KIT_SPRITES.SW = mirror(KIT_SPRITES.SE);
+KIT_SPRITES.NW = mirror(KIT_SPRITES.NE);
+// Screen directions in 45° steps, clockwise from east (screen y points down)
+const DIRS = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"];
+// Where the number sits on each sprite: horizontal nudge, baseline, size scale
+const NUMBER_SPOT = { N: [0, 1.35, 1], S: [0, 1.5, .9], NE: [.17, 1.4, .92], SE: [.17, 1.5, .85], E: [0, 1.8, .72] };
+NUMBER_SPOT.W = NUMBER_SPOT.E;
+NUMBER_SPOT.NW = [-.17, 1.4, .92];
+NUMBER_SPOT.SW = [-.17, 1.5, .85];
+
 const PX = .34, KIT_W = 18 * PX, KIT_H = 14 * PX;
-(function buildKitSymbol() {
-  const sym = el("symbol", { id: "kit", viewBox: "0 0 18 14", "shape-rendering": "crispEdges" }, svg.querySelector("defs"));
+(function buildKitSymbols() {
+  const defs = svg.querySelector("defs");
   // Each layer merges runs of matching pixels into one rect so no seams show between pixels
-  const layers = [["BTH", "currentColor"], ["SC", "var(--sleeve, currentColor)"], ["TC", "rgba(0,0,0,.32)"], ["H", "rgba(255,255,255,.45)"], ["K", "#14110f"]];
-  for (const [chars, fill] of layers) KIT_ART.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) {
-      if (!chars.includes(row[x])) continue;
-      let w = 1; while (chars.includes(row[x + w])) w++;
-      el("rect", { x, y, width: w, height: 1, style: `fill:${fill}` }, sym);
-      x += w - 1;
-    }
-  });
+  const layers = [["BTHW", "currentColor"], ["SC", "var(--sleeve, currentColor)"], ["TC", "rgba(0,0,0,.32)"],
+    ["H", "rgba(255,255,255,.45)"], ["W", "#f1e2a6"], ["K", "#14110f"]];
+  for (const [dir, art] of Object.entries(KIT_SPRITES)) {
+    const sym = el("symbol", { id: "kit-" + dir, viewBox: "0 0 18 14", "shape-rendering": "crispEdges" }, defs);
+    for (const [chars, fill] of layers) art.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        if (!chars.includes(row[x])) continue;
+        let w = 1; while (chars.includes(row[x + w])) w++;
+        el("rect", { x, y, width: w, height: 1, style: `fill:${fill}` }, sym);
+        x += w - 1;
+      }
+    });
+  }
 })();
+
+// Which way a player faces: towards the ball, or towards the opposition goal when the ball is hidden
+function facing(p) {
+  const dx = state.ball.y - p.y, dy = p.x - state.ball.x; // screen offsets of the ball from the player
+  if (!state.showBall || Math.hypot(dx, dy) < 1) return p.side === "home" ? "N" : "S";
+  const sector = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+  return DIRS[(sector + 8) % 8];
+}
+
+const kitNodes = new Map(); // player id → { shadow, kit, num, dir }
+function setFacing(p) {
+  const n = kitNodes.get(p.id); if (!n) return;
+  const dir = facing(p); if (dir === n.dir) return;
+  n.dir = dir;
+  n.shadow.setAttribute("href", "#kit-" + dir);
+  n.kit.setAttribute("href", "#kit-" + dir);
+  const [nx, ny, scale] = NUMBER_SPOT[dir];
+  n.num.setAttribute("x", nx);
+  n.num.setAttribute("y", ny);
+  n.num.setAttribute("font-size", (p.num.length > 1 ? 1.45 : 1.75) * scale);
+}
+function updateFacings() { for (const side of ["home", "away"]) state[side].players.forEach(setFacing); }
 
 function drawPlayer(p) {
   const g = el("g", { class: "player", transform: place(p), tabindex: 0, role: "button", "aria-label": `${p.num} ${p.name || p.pos}` }, gPlayers);
   const home = p.side === "home";
   if (selected === p.id) el("rect", { x: -KIT_W / 2 - .7, y: -KIT_H / 2 - .7, width: KIT_W + 1.4, height: KIT_H + 1.4, fill: "none",
     stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, g);
-  el("use", { href: "#kit", x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, g);
-  el("use", { href: "#kit", x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, g);
-  const t = el("text", { y: 1.35, "text-anchor": "middle", "font-size": p.num.length > 1 ? 1.45 : 1.75,
-    fill: home ? "#fff" : "#14110f", "font-family": "'Press Start 2P', monospace" }, g);
-  t.textContent = p.num;
+  const shadow = el("use", { x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, g);
+  const kit = el("use", { x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, g);
+  const num = el("text", { "text-anchor": "middle", fill: home ? "#fff" : "#14110f", "font-family": "'Press Start 2P', monospace" }, g);
+  num.textContent = p.num;
   const lt = el("text", { y: KIT_H / 2 + 2, "text-anchor": "middle", "font-size": 1.5, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .4, "paint-order": "stroke" }, g);
   lt.textContent = (p.name || p.pos).toUpperCase();
+  kitNodes.set(p.id, { shadow, kit, num, dir: null });
+  setFacing(p);
   makeDraggable(g, p);
   g.addEventListener("keydown", e => { if (e.key === "Enter") select(p.id); });
 }
@@ -298,6 +405,7 @@ function makeDraggable(g, obj) {
       const p = toPitch(ev); obj.x = ox + p.x - start.x; obj.y = oy + p.y - start.y;
       if (Math.hypot(p.x - start.x, p.y - start.y) > .4) moved = true;
       g.setAttribute("transform", place(obj));
+      if (obj.id) setFacing(obj); else updateFacings(); // a player turns to the ball; moving the ball turns everyone
     };
     const up = () => {
       g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up);
