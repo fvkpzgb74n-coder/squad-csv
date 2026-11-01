@@ -280,7 +280,7 @@ function drawPlayer(p) {
   el("use", { href: "#kit", x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, g);
   el("use", { href: "#kit", x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, g);
   const t = el("text", { y: 1.35, "text-anchor": "middle", "font-size": p.num.length > 1 ? 1.45 : 1.75,
-    fill: home ? "var(--home-sleeve)" : "#14110f", "font-family": "'Press Start 2P', monospace" }, g);
+    fill: home ? "#fff" : "#14110f", "font-family": "'Press Start 2P', monospace" }, g);
   t.textContent = p.num;
   const lt = el("text", { y: KIT_H / 2 + 2, "text-anchor": "middle", "font-size": 1.5, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .4, "paint-order": "stroke" }, g);
