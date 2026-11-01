@@ -24,11 +24,16 @@ const everyone = () => [...state.home.players, ...state.away.players];
 const keeperOf = side => squadList(side).find(p => p.pos === "GK") || squadList(side)[0];
 // Tired players lose pace first, and some sharpness on the ball and in the tackle
 const FATIGUE = { pace: 0.3, dribbling: 0.15, defending: 0.15, physical: 0.2 };
-const attr = (p, key) => {
+const rawAttr = (p, key) => {
   const base = p[key] || p.ovr || 60;
   const f = FATIGUE[key];
   return f ? base * (1 - f * (1 - (p.energy ?? 100) / 100)) : base;
 };
+// In head-to-head contests (passing, tackles, interceptions, pace, finishing, saves) ratings are
+// pulled towards an average so small gaps don't snowball into certain wins: better players still
+// win more often, but a few points of quality is an edge, not a mismatch.
+const SKILL_MID = 70, SKILL_SPREAD = 0.5;
+const attr = (p, key) => SKILL_MID + (rawAttr(p, key) - SKILL_MID) * SKILL_SPREAD;
 // Stamina drain in % per match minute: players finish about 55% (stamina 90+) down to about 35% (stamina 55).
 // Keepers barely run, so they tire far more slowly; sprinting tires everyone faster.
 const drainRate = p => (0.45 + (100 - (p.stamina || 65)) / 135) * (p.pos === "GK" ? 0.25 : 1);
@@ -137,7 +142,7 @@ const scoreLine = () => `${state.home.name} ${match.score.home}–${match.score.
 const FORWARD_DEPTH = 24; // metres ahead of the back line on the board that makes a player a forward
 // Team tactics, 0–100, set by how good each XI is compared with the opposition:
 // the better side holds a higher line and attacks more patiently; the weaker side sits deeper and goes direct.
-const TACTIC_PER_POINT = 2; // tactic points per point of average rating difference
+const TACTIC_PER_POINT = 1; // tactic points per point of average rating difference
 function tacticsFor(side) {
   const mine = avgOvr(state[side]) || 70, theirs = avgOvr(state[otherSide(side)]) || 70;
   const edge = (mine - theirs) * TACTIC_PER_POINT;
@@ -217,7 +222,7 @@ function checkBall() {
     s.resolved = true;
     if (Math.abs(b.y - 34) < GOAL_HALF) {
       const gk = keeperOf(otherSide(s.side));
-      const save = clamp(0.64 + (attr(gk, "ovr") - 70) / 60 - (attr(s.by, "shooting") - 70) / 90 + (s.dist - 16) / 60, 0.15, 0.92);
+      const save = clamp(0.64 + (attr(gk, "ovr") - 70) / 110 - (attr(s.by, "shooting") - 70) / 160 + (s.dist - 16) / 60, 0.15, 0.92);
       if (Math.random() < save) {
         addEvent(`${minute()}' Save! ${gk.name} keeps out ${s.by.name}.`);
         gk.x = goalX(s.side) - dirOf(s.side) * 1.5; gk.y = clamp(b.y, 31, 37);
@@ -298,7 +303,7 @@ function movePlayers(dt) {
       oppLineX,
       ref: Math.min(...list.filter(p => p.pos !== "GK").map(p => d * (p.bx - ownGoalX(side)))),
       line: (attacking ? clamp(ballU - 24, 22, 60) : clamp(ballU - 18, 16, 58))
-        + (tactics.defLine - 50) * (attacking ? 0.1 : 0.16), // up to ±8 m when defending
+        + (tactics.defLine - 50) * (attacking ? 0.04 : 0.07), // a gentle lift or drop: about ±2.5 m at the extremes
     };
     for (const p of list) {
       let tx, ty, sprint = false;
@@ -415,7 +420,7 @@ function carrierThink(dt) {
   // Dribbling skill is judged against the player's own level: a 64-rated winger with 70 dribbling is a
   // good dribbler for his level, a centre-back usually dribbles well below his overall.
   // Typical gaps: wingers +2 (best +5 or more), full-backs -3, centre-backs -13.
-  const flairGap = attr(c, "dribbling") - (c.ovr || attr(c, "dribbling"));
+  const flairGap = rawAttr(c, "dribbling") - (c.ovr || rawAttr(c, "dribbling")); // true ratings: style, not contest
   const keepItSimple = Math.max(0, (-flairGap - 1) * 0.5); // poor dribblers look for the simple, short pass
   let best = null, bestScore = -Infinity;
   for (const m of mates) {
@@ -470,7 +475,7 @@ function shoot(c) {
   const b = state.ball, gx = goalX(c.side);
   const aimY = 34 + (Math.random() * 2 - 1) * (GOAL_HALF - 0.6);
   const L = Math.hypot(gx - c.x, aimY - c.y);
-  const miss = gauss() * ((100 - attr(c, "shooting")) / 100) * (3 + L * 0.18); // metres wide of the aim
+  const miss = gauss() * (0.3 + (100 - attr(c, "shooting")) / 300) * (3 + L * 0.18); // metres wide of the aim; skill narrows it a little
   const ang = Math.atan2(aimY + miss - c.y, gx - c.x);
   const v = 24 + attr(c, "shooting") / 12;
   release(c);
