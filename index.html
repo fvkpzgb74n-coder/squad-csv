@@ -379,26 +379,44 @@ function setFacing(p) {
   n.num.setAttribute("y", ny);
   n.num.setAttribute("font-size", (p.num.length > 1 ? 1.45 : 1.75) * scale);
   // The number is printed on the back, so only show it when the back is in view
-  n.num.style.display = dir.startsWith("N") ? "" : "none";
+  n.num.style.display = n.nameBar.style.display = dir.startsWith("N") ? "" : "none";
+  n.nameBar.setAttribute("transform", `translate(${nx} 0)`);
 }
 function updateFacings() { for (const side of ["home", "away"]) state[side].players.forEach(setFacing); }
+
+// A row of tiny blocks above the number that suggests a printed surname without being readable.
+// One block per letter (up to 9), with each letter's shape picked from its character code.
+function drawNameBar(name, colour, parent) {
+  const letters = name.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 9) || "PLAYER";
+  const w = .2, gap = .07, top = -1.25, total = letters.length * (w + gap) - gap;
+  const g = el("g", { opacity: .8 }, parent);
+  [...letters].forEach((ch, i) => {
+    const x = -total / 2 + i * (w + gap), c = ch.charCodeAt(0);
+    el("rect", { x, y: top, width: w, height: .3, fill: colour }, g);
+    // Knock a pixel out of some letters so the row has texture like real lettering
+    if (c % 3 === 0) el("rect", { x: x + w / 3, y: top + .1, width: w / 3, height: .1, fill: "var(--hole)" }, g);
+    if (c % 4 === 1) el("rect", { x: x + w / 3, y: top + .2, width: w / 3, height: .1, fill: "var(--hole)" }, g);
+  });
+  return g;
+}
 
 function drawPlayer(p) {
   const g = el("g", { class: "player", transform: place(p), tabindex: 0, role: "button", "aria-label": `${p.num} ${p.name || p.pos}` }, gPlayers);
   const home = p.side === "home", keeper = p.pos === "GK";
   // Invisible touch target, so the smaller shirts are still easy to grab with a finger
   el("circle", { r: 2.6, fill: "transparent" }, g);
-  const icon = el("g", { transform: `scale(${ICON_SCALE})` }, g);
+  const icon = el("g", { transform: `scale(${ICON_SCALE})`, style: `--hole:var(--${p.side}${keeper ? "-gk" : ""})` }, g);
   if (selected === p.id) el("rect", { x: -KIT_W / 2 - .7, y: -KIT_H / 2 - .7, width: KIT_W + 1.4, height: KIT_H + 1.4, fill: "none",
     stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, icon);
   const shadow = el("use", { x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, icon);
   const kit = el("use", { x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: keeper ? `color:var(--${p.side}-gk)` : `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, icon);
   const num = el("text", { "text-anchor": "middle", fill: home || keeper ? "#fff" : "#14110f", "font-family": "'Press Start 2P', monospace" }, icon);
   num.textContent = p.num;
+  const nameBar = drawNameBar(p.name || p.pos, home || keeper ? "#fff" : "#14110f", icon);
   const lt = el("text", { y: KIT_H * ICON_SCALE / 2 + 1.5, "text-anchor": "middle", "font-size": 1.15, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .35, "paint-order": "stroke" }, g);
   lt.textContent = (p.name || p.pos).toUpperCase();
-  kitNodes.set(p.id, { shadow, kit, num, dir: null });
+  kitNodes.set(p.id, { shadow, kit, num, nameBar, dir: null });
   setFacing(p);
   makeDraggable(g, p);
   g.addEventListener("keydown", e => { if (e.key === "Enter") select(p.id); });
