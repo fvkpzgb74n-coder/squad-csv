@@ -185,7 +185,7 @@ function giveBall(p) {
   match.passTo = null; match.shot = null;
   state.ball.vx = state.ball.vy = 0;
   p.dx = p.dy = undefined;
-  match.decide = 0.25 + Math.random() * 0.3;
+  match.decide = 0.15 + Math.random() * 0.2; // move the ball on quickly after receiving it
 }
 
 function release(p) {
@@ -395,7 +395,7 @@ function carrierThink(dt) {
   const c = match.owner;
   if ((match.decide -= dt) > 0) return;
   const tempo = tacticsFor(c.side).attackSpeed / 100; // 0.15 (patient) to 0.85 (direct)
-  match.decide = (0.25 + Math.random() * 0.3) * (1.25 - tempo * 0.5); // quicker teams release the ball sooner
+  match.decide = (0.18 + Math.random() * 0.22) * (1.25 - tempo * 0.5); // quicker teams release the ball sooner
   if (match.kickoffTo) { const to = match.kickoffTo; match.kickoffTo = null; return pass(c, to); }
   const d = dirOf(c.side), opp = squadList(otherSide(c.side)), mates = squadList(c.side).filter(p => p !== c);
   const gx = goalX(c.side), toGoal = Math.hypot(gx - c.x, 34 - c.y);
@@ -451,7 +451,7 @@ function pass(c, m) {
   const b = state.ball, L = dist(c, m);
   const err = gauss() * (1 - attr(c, "passing") / 100) * 0.35; // radians off target: better passers are more accurate
   const ang = Math.atan2(m.y - c.y, m.x + dirOf(c.side) * 1.5 - c.x) + err;
-  const v = Math.min(30, L * BALL_DRAG * 1.15 + 4);
+  const v = Math.min(34, L * BALL_DRAG * 1.15 + 10); // firm, zipped passes
   release(c);
   b.vx = Math.cos(ang) * v; b.vy = Math.sin(ang) * v;
   match.passTo = m;
