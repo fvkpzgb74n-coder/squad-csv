@@ -7,7 +7,7 @@ const PITCH_L = 105, PITCH_W = 68, GOAL_HALF = 3.66;
 const CLOCK_RATE = 22.5; // match seconds per simulated second: 90 minutes take about 4 minutes at 1×
 const STEP = 1 / 60;
 const BALL_DRAG = 0.75, SHOT_DRAG = 0.25;
-const SHOOT_RANGE = 30; // metres from goal where players start looking to shoot
+const SHOOT_RANGE = 27; // metres from goal where players start looking to shoot
 // The match is a fast highlights reel: 90 minutes pass in about 4, so teams play more directly than real life // how quickly a rolling ball slows down (per second)
 
 const match = { active: false, running: false, speed: 1 };
@@ -216,7 +216,7 @@ function checkBall() {
     s.resolved = true;
     if (Math.abs(b.y - 34) < GOAL_HALF) {
       const gk = keeperOf(otherSide(s.side));
-      const save = clamp(0.55 + (attr(gk, "ovr") - 70) / 60 - (attr(s.by, "shooting") - 70) / 90 + (s.dist - 16) / 60, 0.15, 0.92);
+      const save = clamp(0.64 + (attr(gk, "ovr") - 70) / 60 - (attr(s.by, "shooting") - 70) / 90 + (s.dist - 16) / 60, 0.15, 0.92);
       if (Math.random() < save) {
         addEvent(`${minute()}' Save! ${gk.name} keeps out ${s.by.name}.`);
         gk.x = goalX(s.side) - dirOf(s.side) * 1.5; gk.y = clamp(b.y, 31, 37);
@@ -337,7 +337,7 @@ function movePlayers(dt) {
         p.energy = Math.max(0, (p.energy ?? 100) - (dt * CLOCK_RATE / 60) * drainRate(p) * (sprint ? 1.4 : 0.9));
       }
       const pace = attr(p, "pace");
-      const speed = (4.2 + pace * 0.042) * (sprint ? 1 : 0.8) * (p === match.owner ? 0.85 : 1) * (match.pause > 0 ? 0.6 : 1);
+      const speed = (5.5 + pace * 0.055) * (sprint ? 1 : 0.85) * (p === match.owner ? 0.85 : 1) * (match.pause > 0 ? 0.6 : 1);
       const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy);
       if (L > 0.2) { const m = Math.min(L, speed * dt); p.x += (dx / L) * m; p.y += (dy / L) * m; }
     }
