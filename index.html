@@ -79,7 +79,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 }
 .card .stars::before { content: "★★★★★"; }
 .card .stars .on { position: absolute; inset: 0 auto 0 0; overflow: hidden; white-space: nowrap; color: #f2c230; }
-/* Star colour by tier: gold 4 and up, silver 3 to 3.5, bronze below 3 */
+/* Star colour by tier: gold 3.5 and up, silver 2.5 to 3, bronze below 2.5 */
 .card .stars.silver .on { color: #c4ccd2; }
 .card .stars.bronze .on { color: #c8834a; }
 .card .stars .on::before { content: "★★★★★"; }
@@ -582,7 +582,7 @@ function playerCard(num, name, pos, ovr, opts) {
   const st = starsFor(ovr);
   d.querySelector(".stars").setAttribute("aria-label", `${st} out of 5 stars`);
   d.querySelector(".stars").title = `${st} / 5`;
-  d.querySelector(".stars").classList.add(st >= 4 ? "gold" : st >= 3 ? "silver" : "bronze");
+  d.querySelector(".stars").classList.add(st >= 3.5 ? "gold" : st >= 2.5 ? "silver" : "bronze");
   d.querySelector(".stars .on").style.width = `${(st / 5) * 100}%`;
   d.querySelector(".nm").textContent = name || "—";
   d.querySelector(".pos").textContent = pos;
