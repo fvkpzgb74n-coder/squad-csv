@@ -36,7 +36,7 @@ h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter
 .score { color: var(--muted); font-variant-numeric: tabular-nums; }
 .toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
 .pitch-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
-svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 110px); touch-action: none; user-select: none; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.45); }
+svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 110px); touch-action: none; user-select: none; }
 aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
 aside h2 { font-family: var(--font-display); font-weight: 500; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
 label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
@@ -88,7 +88,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
     <button id="toggle-ball" aria-pressed="true">Show ball</button>
   </div>
   <div class="pitch-wrap">
-    <svg id="pitch" viewBox="-4 -4 113 76" aria-label="Football pitch, 105 by 68 metres">
+    <svg id="pitch" viewBox="-4 -4 76 113" aria-label="Football pitch, 68 by 105 metres, your team attacking upwards">
       <defs>
         <pattern id="stripes" width="10.5" height="68" patternUnits="userSpaceOnUse">
           <rect width="5.25" height="68" fill="var(--grass-a)"/>
@@ -97,7 +97,9 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
         <marker id="head-pass" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#fff"/></marker>
         <marker id="head-run" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--home)"/></marker>
       </defs>
-      <rect x="-4" y="-4" width="113" height="76" fill="#25613a"/>
+      <rect x="-4" y="-4" width="76" height="113" fill="#25613a"/>
+      <!-- model coords run along the length (x 0..105); rotate so x=105 is the top goal -->
+      <g transform="matrix(0 -1 1 0 0 105)">
       <rect width="105" height="68" fill="url(#stripes)"/>
       <g fill="none" stroke="var(--chalk)" stroke-width=".25">
         <rect width="105" height="68"/>
@@ -118,6 +120,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
         <path d="M0 1 A1 1 0 0 0 1 0 M104 0 A1 1 0 0 0 105 1 M0 67 A1 1 0 0 1 1 68 M104 68 A1 1 0 0 1 105 67"/>
       </g>
       <g id="arrows"></g>
+      </g>
       <g id="players"></g>
     </svg>
   </div>
@@ -212,8 +215,11 @@ function el(tag, attrs, parent) {
 function toPitch(evt) {
   const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
   const p = pt.matrixTransform(svg.getScreenCTM().inverse());
-  return { x: Math.max(-3, Math.min(108, p.x)), y: Math.max(-3, Math.min(71, p.y)) };
+  return { x: Math.max(-3, Math.min(108, 105 - p.y)), y: Math.max(-3, Math.min(71, p.x)) };
 }
+
+// Screen position for a model point: pitch is drawn vertically
+const place = o => `translate(${o.y} ${105 - o.x})`;
 
 function render() {
   gPlayers.replaceChildren(); gArrows.replaceChildren();
@@ -225,7 +231,7 @@ function render() {
   const teams = state.showAway ? ["away", "home"] : ["home"];
   for (const side of teams) for (const p of state[side].players) drawPlayer(p);
   if (state.showBall) {
-    const b = el("g", { class: "player", transform: `translate(${state.ball.x} ${state.ball.y})` }, gPlayers);
+    const b = el("g", { class: "player", transform: place(state.ball) }, gPlayers);
     el("circle", { r: 1, fill: "#fff", stroke: "#111", "stroke-width": .2 }, b);
     el("circle", { r: .35, fill: "#111" }, b);
     makeDraggable(b, state.ball);
@@ -233,7 +239,7 @@ function render() {
   renderSide();
 }
 function drawPlayer(p) {
-  const g = el("g", { class: "player", transform: `translate(${p.x} ${p.y})`, tabindex: 0, role: "button", "aria-label": `${p.num} ${p.name || p.pos}` }, gPlayers);
+  const g = el("g", { class: "player", transform: place(p), tabindex: 0, role: "button", "aria-label": `${p.num} ${p.name || p.pos}` }, gPlayers);
   const col = p.side === "home" ? "var(--home)" : "var(--away)";
   if (selected === p.id) el("circle", { r: 3, fill: "none", stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, g);
   el("circle", { r: 2.1, fill: col, stroke: "#0b0f0c", "stroke-width": .3 }, g);
@@ -255,7 +261,7 @@ function makeDraggable(g, obj) {
     const move = ev => {
       const p = toPitch(ev); obj.x = ox + p.x - start.x; obj.y = oy + p.y - start.y;
       if (Math.hypot(p.x - start.x, p.y - start.y) > .4) moved = true;
-      g.setAttribute("transform", `translate(${obj.x} ${obj.y})`);
+      g.setAttribute("transform", place(obj));
     };
     const up = () => {
       g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up);
