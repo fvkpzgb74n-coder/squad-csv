@@ -4,6 +4,7 @@ Keeps only the fields the board uses, grouped by club, so the page loads quickly
 Run from the repository root:  python3 scripts/build_players.py
 """
 import csv
+import re
 import json
 from pathlib import Path
 
@@ -22,8 +23,20 @@ def as_int(value):
         return 0
 
 
-def shirt_name(row):
-    return (row["shirt_name"] or row["last_name"] or row["name"]).strip()
+def known_as(row):
+    """The short name a player is known by. The CSV has no such column, so it is built from the
+    shirt name (minus initials, so "M.Bizot" -> "Bizot", "Bruno G." -> "Bruno"); when that is only
+    the first name ("Virgil", "Zion") the display name without the first name is used ("van Dijk")."""
+    name, first, shirt = row["name"].strip(), row["first_name"].strip(), row["shirt_name"].strip()
+    if name and " " not in name:  # single-name players: Rodri, Pedri, Alisson, Gabriel
+        return name
+    short = re.sub(r"^(?:[^\W\d_]\.\s*)+", "", shirt)
+    short = re.sub(r"(?:\s+[^\W\d_]\.)+$", "", short).strip()
+    if short and short != first:
+        return short
+    if first and name.startswith(first + " "):
+        return name[len(first) + 1:]
+    return short or name
 
 
 def main():
@@ -33,7 +46,7 @@ def main():
             club = clubs.setdefault(row["club"], {"league": row["league"], "players": []})
             club["players"].append([
                 int(row["player_id"]),
-                shirt_name(row),
+                known_as(row),
                 row["name"].strip(),
                 row["shirt_number"].strip(),
                 row["position"].strip(),
