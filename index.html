@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tactics Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Press+Start+2P&family=Silkscreen&family=Jersey+10&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: pitch fills the left, a slim control rail on the right; stacks on phones. Single dark "floodlit stadium" world. */
+:root {
+  /* Interface: deep indigo with faded cyan and purple accents */
+  --bg: #0a0b18;
+  --panel: #10122a;
+  --line: #232849;
+  --ink: #e4e7fb;
+  --muted: #8d93c2;
+  --accent: #7ccfe0;        /* faded cyan */
+  --accent-2: #a892e0;      /* faded purple */
+  --wash: linear-gradient(150deg, #0f0f28 0%, #0a0f22 45%, #08141f 100%);
+  --home: #7a1e3c;          /* claret shirt */
+  --home-sleeve: #9ccff0;   /* pale blue sleeves */
+  --run: var(--home-sleeve);
+  --away: #f2c230;
+  --home-gk: #3a3d46;       /* goalkeeper kits */
+  --away-gk: #e2507f;
+  --chalk: rgba(255,255,255,.82);
+  --grass-a: #2f7a45;
+  --grass-b: #2b7040;
+  --font-display: "Oswald", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-panel: "Jersey 10", "IBM Plex Sans", system-ui, sans-serif; /* pixel-styled but clean, like shirt lettering */
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); background-image: var(--wash); background-attachment: fixed;
+  color: var(--ink); font-family: var(--font-body); font-size: 14px;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 16px; padding: 16px;
+}
+main { display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 0; width: 100%; }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: .04em; text-transform: uppercase; margin: 0; }
+.score { color: var(--muted); font-variant-numeric: tabular-nums; }
+.toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
+.pitch-wrap { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 100px); touch-action: none; user-select: none; }
+aside[hidden] { display: none; }
+aside { font-family: var(--font-panel); font-size: 18px; letter-spacing: .02em; background: rgba(16, 18, 42, .85); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+aside h2 { font-family: var(--font-panel); font-weight: 400; font-size: 20px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); margin: 0 0 8px; }
+label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+select, input[type=text] {
+  width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 5px;
+  padding: 7px 8px; font: inherit;
+}
+button {
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 5px;
+  padding: 7px 11px; font: inherit; font-weight: 500; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .4; cursor: default; }
+/* Match stats: your team on the left, the opposition on the right */
+.stats { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; row-gap: 6px; column-gap: 12px; font-size: 22px; }
+.stats .sv { font-variant-numeric: tabular-nums; }
+.stats .sv.h { text-align: left; }
+.stats .sv.a { text-align: right; }
+.stats .sl { color: var(--muted); font-size: 17px; text-align: center; }
+.stats-gap { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 4px 0; }
+.poss-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--away); overflow: hidden; margin-bottom: 4px; }
+.poss-bar span { display: block; height: 100%; width: 50%; background: linear-gradient(90deg, var(--home-sleeve), var(--home)); transition: width .4s; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.team-pill { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; }
+#editor[hidden] { display: none; }
+/* Player cards: each one can be dragged onto another to make a sub or swap */
+.cards { display: grid; gap: 8px; }
+/* Your team and the opposition side by side; the opposition's cards mirror yours */
+.teams { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.team-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+aside h2.right { text-align: right; }
+.card {
+  display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px;
+  cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.card:hover { border-color: var(--muted); }
+.card.sel { border-color: var(--accent-2); }
+.card.drop-target { border-color: var(--accent); background: #161b3c; box-shadow: 0 0 0 2px var(--accent) inset; }
+.card.drag-source { opacity: .35; }
+/* 8-bit star rating: pixel stars with black outlines, tier colour set on the svg */
+.card .stars { display: block; width: 62px; height: 12px; image-rendering: pixelated; }
+.card.away { grid-template-columns: auto minmax(0, 1fr) 26px; cursor: pointer; }
+.card.away[data-kind="away-bench"] { cursor: default; }
+.card.away .stamina { order: 1; }
+.card.away .stars { order: 2; }
+.card.away .nm { order: 3; text-align: right; }
+.card.away .pos { order: 4; text-align: right; }
+.card .stars.gold { color: #f6c84a; }
+.card .stars.silver { color: #c9d1d8; }
+.card .stars.bronze { color: #cf8a4e; }
+/* 8-bit stamina bar: one solid bar inside a square black frame */
+.card .stamina { display: block; width: 40px; height: 12px; padding: 2px; background: #000; box-shadow: 0 0 0 1px #2a2f55; }
+.card .stamina i { display: block; height: 100%; background: #1a1d36; }
+.card .stamina i b { display: block; height: 100%; width: 100%; }
+.card .nm { text-transform: uppercase; font-size: 20px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .pos { color: var(--muted); font-size: 16px; }
+#bench .card { background: transparent; }
+.drag-ghost { position: fixed; z-index: 10; pointer-events: none; width: 260px; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+/* Scoreboard: team v team, score and clock, in the shirt-lettering font */
+.scoreboard {
+  align-self: center; max-width: 100%; display: flex; align-items: stretch; gap: 0; position: relative;
+  font-family: var(--font-panel); background: rgba(16, 18, 42, .85); border: 1px solid var(--line); border-radius: 8px;
+}
+.sb-side { position: relative; display: flex; }
+.sb-team {
+  display: flex; align-items: center; gap: 10px; background: none; border: none; border-radius: 0;
+  padding: 8px 14px; font: inherit; font-size: 24px; letter-spacing: .03em; color: var(--ink); min-width: 0;
+}
+.sb-side:first-child .sb-team { justify-content: flex-end; }
+.sb-team:hover { background: var(--bg); }
+.sb-kit { width: 14px; height: 22px; border-radius: 3px; flex: none; }
+.sb-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.sb-score {
+  display: flex; align-items: center; gap: 8px; padding: 0 16px; background: linear-gradient(180deg, #181c42, #0e1028);
+  font-size: 34px; font-variant-numeric: tabular-nums; border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+}
+.sb-dash { color: var(--muted); }
+.sb-clock {
+  display: flex; align-items: center; padding: 0 16px; border-left: 1px solid var(--line);
+  font-size: 24px; font-variant-numeric: tabular-nums; color: var(--accent); min-width: 80px; justify-content: center;
+}
+.sb-controls { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-left: 1px solid var(--line); }
+.sb-btn { font-family: var(--font-panel); font-size: 18px; min-width: 38px; height: 34px; padding: 0 8px; }
+#kickoff { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--bg); border: none; }
+.popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; width: 230px; display: grid; gap: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+  font-family: var(--font-body); box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+.popover.right { left: auto; right: 0; }
+.popover[hidden] { display: none; }
+.popover select { margin-bottom: 0; }
+@media (max-width: 820px) {
+  .sb-team { min-width: 0; font-size: 20px; padding: 6px 10px; }
+  .sb-score, .sb-clock { font-size: 22px; padding: 0 10px; }
+}
+.player { cursor: grab; }
+.player.dragging { cursor: grabbing; }
+.player text { pointer-events: none; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 5px; font-weight: 500; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+@media (max-width: 1100px) {
+  body { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 820px) {
+  body { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
+  svg#pitch { max-height: none; }
+}
+#countdown {
+  font-family: var(--font-panel); font-size: 20px; fill: #fff; stroke: rgba(10,11,24,.75); stroke-width: .8px;
+  paint-order: stroke; pointer-events: none; transform-box: fill-box; transform-origin: center;
+}
+#countdown.pop { animation: countdown-pop .9s ease-out both; }
+@keyframes countdown-pop { 0% { transform: scale(1.7); opacity: 0; } 25% { opacity: 1; } 100% { transform: scale(1); opacity: .78; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="scoreboard" role="group" aria-label="Scoreboard">
+    <div class="sb-side">
+      <button class="sb-team" id="home-team-btn" aria-haspopup="true" aria-controls="home-pop">
+        <span class="sb-kit" style="background:linear-gradient(90deg,var(--home-sleeve) 0 25%,var(--home) 25% 75%,var(--home-sleeve) 75%)"></span>
+        <span class="sb-name" id="sb-home-name"></span>
+      </button>
+      <div class="popover" id="home-pop" hidden>
+        <label for="home-club">Club</label><input type="text" id="home-club" list="club-list" autocomplete="off" placeholder="Search clubs">
+        <label for="home-formation">Formation</label><select id="home-formation"></select>
+      </div>
+    </div>
+    <div class="sb-score"><span id="sb-home-score">0</span><span class="sb-dash">-</span><span id="sb-away-score">0</span></div>
+    <div class="sb-side">
+      <button class="sb-team" id="away-team-btn" aria-haspopup="true" aria-controls="away-pop">
+        <span class="sb-name" id="sb-away-name"></span>
+        <span class="sb-kit" style="background:var(--away)"></span>
+      </button>
+      <div class="popover right" id="away-pop" hidden>
+        <label for="away-club">Club</label><input type="text" id="away-club" list="club-list" autocomplete="off" placeholder="Search clubs">
+        <label for="away-formation">Formation</label><select id="away-formation"></select>
+      </div>
+    </div>
+    <div class="sb-clock" id="sb-clock">00:00</div>
+    <div class="sb-controls">
+      <button class="sb-btn" id="kickoff" aria-label="Kick off">&#9654;</button>
+      <button class="sb-btn" id="speed" hidden aria-label="Match speed">1&times;</button>
+      <button class="sb-btn" id="end-match" hidden aria-label="End match">&#9632;</button>
+    </div>
+    <datalist id="club-list"></datalist>
+  </div>
+  <div class="pitch-wrap">
+    <svg id="pitch" viewBox="-4 -4 83 113" aria-label="Football pitch, 75 by 105 metres, your team attacking upwards">
+      <defs>
+        <pattern id="stripes" width="10.5" height="75" patternUnits="userSpaceOnUse">
+          <rect width="5.25" height="75" fill="var(--grass-a)"/>
+          <rect x="5.25" width="5.25" height="75" fill="var(--grass-b)"/>
+        </pattern>
+        <marker id="head-pass" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#fff"/></marker>
+        <marker id="head-run" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--run)"/></marker>
+      </defs>
+      <rect x="-4" y="-4" width="83" height="113" fill="#25613a"/>
+      <!-- Drawn 75 m wide (the widest the Laws allow). The match runs on a 68 m model, stretched across
+           the width when drawn (DRAW_SCALE), so markings stay true and players spread to fill it. -->
+      <!-- model coords run along the length (x 0..105); rotate so x=105 is the top goal -->
+      <g transform="matrix(0 -1 1 0 0 105)">
+      <rect width="105" height="75" fill="url(#stripes)"/>
+      <g fill="none" stroke="var(--chalk)" stroke-width=".25">
+        <rect width="105" height="75"/>
+        <line x1="52.5" y1="0" x2="52.5" y2="75"/>
+        <circle cx="52.5" cy="37.5" r="9.15"/>
+        <circle cx="52.5" cy="37.5" r=".4" fill="var(--chalk)"/>
+        <!-- penalty areas 16.5m deep, 40.32m wide -->
+        <rect x="0" y="17.34" width="16.5" height="40.32"/>
+        <rect x="88.5" y="17.34" width="16.5" height="40.32"/>
+        <rect x="0" y="28.34" width="5.5" height="18.32"/>
+        <rect x="99.5" y="28.34" width="5.5" height="18.32"/>
+        <circle cx="11" cy="37.5" r=".4" fill="var(--chalk)"/>
+        <circle cx="94" cy="37.5" r=".4" fill="var(--chalk)"/>
+        <path d="M16.5 30.19 A9.15 9.15 0 0 1 16.5 44.81"/>
+        <path d="M88.5 30.19 A9.15 9.15 0 0 0 88.5 44.81"/>
+        <rect x="-2" y="33.84" width="2" height="7.32"/>
+        <rect x="105" y="33.84" width="2" height="7.32"/>
+        <path d="M0 1 A1 1 0 0 0 1 0 M104 0 A1 1 0 0 0 105 1 M0 74 A1 1 0 0 1 1 75 M104 75 A1 1 0 0 1 105 74"/>
+      </g>
+      <g id="arrows" transform="scale(1 1.102941)"></g>
+      </g>
+      <g id="players"></g>
+      <g id="puffs" pointer-events="none"></g>
+    </svg>
+  </div>
+</main>
+
+<aside hidden>
+  <section id="match-panel">
+    <h2>Match</h2>
+    <div class="stats" id="stats">
+      <span class="sv h" id="st-def-h">50</span><span class="sl">Defensive line</span><span class="sv a" id="st-def-a">50</span>
+      <span class="sv h" id="st-spd-h">50</span><span class="sl">Attacking speed</span><span class="sv a" id="st-spd-a">50</span>
+      <div class="stats-gap"></div>
+      <span class="sv h" id="st-poss-h">50%</span><span class="sl">Possession</span><span class="sv a" id="st-poss-a">50%</span>
+      <div class="poss-bar"><span id="st-poss-bar"></span></div>
+      <span class="sv h" id="st-shots-h">0</span><span class="sl">Shots</span><span class="sv a" id="st-shots-a">0</span>
+      <span class="sv h" id="st-goals-h">0</span><span class="sl">Goals</span><span class="sv a" id="st-goals-a">0</span>
+    </div>
+  </section>
+  <section id="editor" hidden>
+    <h2>Selected player</h2>
+    <div class="row">
+      <div><label for="ed-num">Number</label><input type="text" id="ed-num" maxlength="2"></div>
+      <div><label for="ed-pos">Position</label><input type="text" id="ed-pos" maxlength="4"></div>
+    </div>
+    <div style="margin-top:8px"><label for="ed-name">Name</label><input type="text" id="ed-name" maxlength="20"></div>
+  </section>
+  <div class="teams">
+    <div class="team-col">
+      <section>
+        <h2>Line-up</h2>
+        <div class="cards" id="roster"></div>
+      </section>
+      <section>
+        <h2>Bench</h2>
+        <div class="cards" id="bench"></div>
+      </section>
+    </div>
+    <div class="team-col">
+      <section>
+        <h2 class="right">Opposition</h2>
+        <div class="cards" id="away-roster"></div>
+      </section>
+      <section>
+        <h2 class="right">Bench</h2>
+        <div class="cards" id="away-bench"></div>
+      </section>
+    </div>
+  </div>
+</aside>
+<div class="drag-ghost" id="drag-ghost" hidden></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="players.js"></script>
+<script>
+// Formations: [pos, x, y] for a team attacking left→right, x 0..105, y 0..68
+const FORMATIONS = {
+  "4-3-3":   [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["CM",36,46],["DM",31,34],["CM",36,22],["RW",48,58],["ST",50,34],["LW",48,10]],
+  "4-4-2":   [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["RM",36,58],["CM",34,40],["CM",34,28],["LM",36,10],["ST",48,40],["ST",48,28]],
+  "4-2-3-1": [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["DM",30,41],["DM",30,27],["RW",42,56],["AM",42,34],["LW",42,12],["ST",50,34]],
+  "3-5-2":   [["GK",5,34],["CB",18,46],["CB",16,34],["CB",18,22],["RWB",34,60],["CM",33,44],["DM",29,34],["CM",33,24],["LWB",34,8],["ST",48,40],["ST",48,28]],
+  "3-4-3":   [["GK",5,34],["CB",18,46],["CB",16,34],["CB",18,22],["RM",34,58],["CM",32,40],["CM",32,28],["LM",34,10],["RW",47,54],["ST",50,34],["LW",47,14]],
+  "5-3-2":   [["GK",5,34],["RWB",24,60],["CB",17,46],["CB",15,34],["CB",17,22],["LWB",24,8],["CM",33,46],["CM",31,34],["CM",33,22],["ST",46,40],["ST",46,28]],
+  "3-4-2-1": [["GK",5,34],["CB",18,46],["CB",16,34],["CB",18,22],["RWB",34,60],["CM",32,40],["CM",32,28],["LWB",34,8],["AM",44,44],["AM",44,24],["ST",50,34]],
+  "4-1-4-1": [["GK",5,34],["RB",22,58],["CB",18,42],["CB",18,26],["LB",22,10],["DM",28,34],["RM",38,58],["CM",37,42],["CM",37,26],["LM",38,10],["ST",50,34]],
+};
+const HOME_NAMES = ["Okafor","Reid","Santos","Kowalski","Mensah","Lindqvist","Duarte","Haddad","Moreau","Tanaka","Byrne"];
+const DB = window.PLAYERS_DB || { clubs: {} };
+const DEFAULT_CLUBS = { home: "Aston Villa", away: "Arsenal" };
+
+// Which database positions suit each formation slot, best fit first
+const SLOT_FIT = {
+  GK: ["GK"], CB: ["CB"], RB: ["RB", "RWB"], LB: ["LB", "LWB"], RWB: ["RWB", "RB", "RM"], LWB: ["LWB", "LB", "LM"],
+  DM: ["CDM", "CM"], CM: ["CM", "CDM", "CAM"], AM: ["CAM", "CM", "CF"], RM: ["RM", "RW"], LM: ["LM", "LW"],
+  RW: ["RW", "RM"], LW: ["LW", "LM"], ST: ["ST", "CF"],
+};
+const POS_ORDER = ["GK", "RB", "RWB", "CB", "LB", "LWB", "CDM", "CM", "CAM", "RM", "LM", "RW", "LW", "CF", "ST"];
+const squadOf = club => (DB.clubs[club]?.players || []).map(([pid, name, full, num, pos, other, ovr, foot, pace, shooting, passing, dribbling, defending, physical, stamina]) =>
+  ({ pid, name, full, num, natural: pos, other: other ? other.split(" ") : [], ovr, foot, pace, shooting, passing, dribbling, defending, physical, stamina }));
+
+// How well a player suits a slot: their rating, less a penalty for playing out of position
+function fitScore(pl, slot) {
+  const fits = SLOT_FIT[slot] || [slot];
+  if ((slot === "GK") !== (pl.natural === "GK")) return -Infinity; // keepers only in goal
+  if (pl.natural === fits[0]) return pl.ovr;
+  if (fits.includes(pl.natural)) return pl.ovr - 1;
+  if (pl.other.includes(fits[0])) return pl.ovr - 2;
+  if (fits.some(f => pl.other.includes(f))) return pl.ovr - 3;
+  return pl.ovr - 12;
+}
+// Best XI for a formation: take the strongest player–slot pairings first until every slot is filled
+function pickXI(squad, formation) {
+  const slots = FORMATIONS[formation].map(([pos]) => pos);
+  const pairs = [];
+  slots.forEach((slot, si) => squad.forEach((pl, pi) => pairs.push([fitScore(pl, slot), si, pi])));
+  pairs.sort((a, b) => b[0] - a[0]);
+  const chosen = new Array(slots.length).fill(null), used = new Set();
+  for (const [score, si, pi] of pairs) {
+    if (score === -Infinity || chosen[si] || used.has(pi)) continue;
+    chosen[si] = squad[pi]; used.add(pi);
+  }
+  // A back four never pairs two left-footed centre-backs: the weaker one makes way for the best
+  // right-footed option, preferring a natural centre-back, then anyone who can play there.
+  const cbIdx = slots.map((s, i) => i).filter(i => slots[i] === "CB");
+  if (cbIdx.length === 2 && cbIdx.every(i => chosen[i]?.foot === "L")) {
+    const inXI = new Set(chosen);
+    const rightFooted = squad.filter(pl => !inXI.has(pl) && pl.foot === "R" && pl.natural !== "GK");
+    const cbScore = pl => pl.natural === "CB" ? pl.ovr : pl.other.includes("CB") ? pl.ovr - 3
+      : ["CDM", "RB", "LB"].includes(pl.natural) ? pl.ovr - 10 : -Infinity;
+    const cover = rightFooted.filter(pl => cbScore(pl) > -Infinity).sort((a, b) => cbScore(b) - cbScore(a))[0];
+    if (cover) {
+      const weaker = cbIdx.sort((a, b) => chosen[a].ovr - chosen[b].ovr)[0];
+      chosen[weaker] = cover;
+    }
+  }
+  // Put left-footed centre-backs on the left of the back line and right-footed ones on the right.
+  // Formation y runs from the team's left touchline (0) to its right (68).
+  const cbSlots = slots.map((s, i) => i).filter(i => slots[i] === "CB").sort((a, b) => FORMATIONS[formation][a][2] - FORMATIONS[formation][b][2]);
+  const footOrder = { L: 0, R: 2 }; // two-footed or unknown players fit in the middle
+  const cbs = cbSlots.map(i => chosen[i]).sort((a, b) => (footOrder[a?.foot] ?? 1) - (footOrder[b?.foot] ?? 1));
+  cbSlots.forEach((slot, k) => { chosen[slot] = cbs[k]; });
+  return chosen;
+}
+const RATINGS = ["ovr", "pace", "shooting", "passing", "dribbling", "defending", "physical", "stamina"];
+// A club's formation: the shape whose best XI plays most in their natural positions.
+// The CSV has no team tactics, so this is inferred from the squad rather than taken from real life.
+// Back fours are the norm, so other shapes need a squad that clearly suits them.
+const FORMATION_PRIOR = { "4-3-3": 1, "4-2-3-1": 1.5, "4-4-2": 0, "4-1-4-1": 0, "3-4-2-1": -2, "3-4-3": -2.5, "3-5-2": -2.5, "5-3-2": -4 };
+// Clubs whose real formation is set by hand; every other club's is inferred from its squad
+const CLUB_FORMATIONS = {
+  "Aston Villa": "4-2-3-1",
+};
+function bestFormation(club) {
+  if (CLUB_FORMATIONS[club]) return CLUB_FORMATIONS[club];
+  const squad = squadOf(club);
+  let best = "4-3-3", bestScore = -Infinity;
+  for (const f of Object.keys(FORMATIONS)) {
+    const slots = FORMATIONS[f].map(([pos]) => pos);
+    const score = (FORMATION_PRIOR[f] || 0) + pickXI(squad, f).reduce((sum, pl, i) => sum + (pl ? fitScore(pl, slots[i]) : -50), 0);
+    if (score > bestScore) { best = f; bestScore = score; }
+  }
+  return best;
+}
+// Named substitutes allowed: the Premier League allows 9. Other competitions use the same until set here.
+const BENCH_SIZES = { "England Premier League (1)": 9 };
+const benchSize = club => BENCH_SIZES[DB.clubs[club]?.league] ?? 9;
+// A real matchday bench: a back-up keeper, then cover in defence, midfield and attack, then the best of the rest
+const POSITION_GROUP = { GK: "GK", CB: "DEF", RB: "DEF", LB: "DEF", RWB: "DEF", LWB: "DEF",
+  CDM: "MID", CM: "MID", CAM: "MID", RM: "MID", LM: "MID", RW: "FWD", LW: "FWD", CF: "FWD", ST: "FWD" };
+function pickBench(squad, xi, size) {
+  const inXI = new Set(xi.filter(Boolean).map(pl => pl.pid));
+  const pool = squad.filter(pl => !inXI.has(pl.pid)).sort((a, b) => b.ovr - a.ovr);
+  const bench = [];
+  for (const group of ["GK", "DEF", "MID", "FWD"]) {
+    const best = pool.find(pl => POSITION_GROUP[pl.natural] === group && !bench.includes(pl));
+    if (best && bench.length < size) bench.push(best);
+  }
+  for (const pl of pool) {
+    if (bench.length >= size) break;
+    if (!bench.includes(pl) && !(pl.natural === "GK" && bench.some(b => b.natural === "GK"))) bench.push(pl);
+  }
+  return bench;
+}
+function fromDb(pl) {
+  if (!pl) return {};
+  const out = { pid: pl.pid, name: pl.name, full: pl.full, num: pl.num };
+  for (const k of RATINGS) out[k] = pl[k];
+  return out;
+}
+const svg = document.getElementById("pitch");
+const gPlayers = document.getElementById("players");
+const gArrows = document.getElementById("arrows");
+const NS = "http://www.w3.org/2000/svg";
+
+let state, tool = "move", selected = null;
+let ballNode = null, matchActive = false; // set by render() and match.js
+
+function buildTeam(side, formation, names) {
+  return FORMATIONS[formation].map(([pos, x, y], i) => ({
+    id: side + i, side, pos, num: String(i === 0 ? 1 : i + 1), name: names ? names[i] : "",
+    x: side === "home" ? x : 105 - x, y: side === "home" ? y : 68 - y,
+  }));
+}
+function freshState() {
+  return {
+    home: { name: "Riverside FC", formation: "4-3-3", players: buildTeam("home", "4-3-3", HOME_NAMES) },
+    away: { name: "Opposition", formation: "4-4-2", players: buildTeam("away", "4-4-2") },
+    ball: { x: 54.5, y: 37 }, arrows: [], showAway: true, showBall: true,
+  };
+}
+function startingState() {
+  state = freshState();
+  for (const side of ["home", "away"]) if (DB.clubs[DEFAULT_CLUBS[side]]) loadClub(side, DEFAULT_CLUBS[side]);
+  return state;
+}
+function applyFormation(side, formation) {
+  if (matchActive) endMatch();
+  const team = state[side];
+  const fresh = buildTeam(side, formation);
+  if (team.club && DB.clubs[team.club]) {
+    const xi = pickXI(squadOf(team.club), formation);
+    team.players = fresh.map((p, i) => ({ ...p, ...fromDb(xi[i]) }));
+    team.bench = pickBench(squadOf(team.club), xi, benchSize(team.club)).map(pl => pl.pid);
+    team.subbedOff = [];
+  } else {
+    team.players = fresh.map((p, i) => ({ ...p, name: team.players[i]?.name || "", num: team.players[i]?.num || p.num }));
+  }
+  team.formation = formation;
+  render();
+}
+function loadClub(side, club) {
+  state[side].club = club; state[side].name = club;
+  selected = null;
+  applyFormation(side, bestFormation(club)); // each club lines up in its own formation; the dropdown can still change it
+}
+
+function el(tag, attrs, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function toPitch(evt) {
+  const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: Math.max(-3, Math.min(108, 105 - p.y)), y: Math.max(-3, Math.min(71, p.x / DRAW_SCALE)) };
+}
+
+// Screen position for a model point: pitch is drawn vertically
+const DRAW_W = 75, DRAW_SCALE = DRAW_W / 68; // drawn width, and how much the 68 m model is stretched across it
+const place = o => `translate(${o.y * DRAW_SCALE} ${105 - o.x})`;
+
+function render() {
+  kitNodes.clear(); ballNode = null;
+  gPlayers.replaceChildren(); gArrows.replaceChildren();
+  for (const a of state.arrows) {
+    el("line", { x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2,
+      stroke: a.type === "pass" ? "#fff" : "var(--run)", "stroke-width": .45,
+      "stroke-dasharray": a.type === "run" ? "1.2 .8" : "none", "marker-end": `url(#head-${a.type})`, "stroke-linecap": "round" }, gArrows);
+  }
+  const teams = state.showAway ? ["away", "home"] : ["home"];
+  for (const side of teams) for (const p of state[side].players) drawPlayer(p);
+  if (state.showBall) {
+    const b = ballNode = el("g", { class: "player", transform: place(state.ball) }, gPlayers);
+    el("circle", { r: 1, fill: "#fff", stroke: "#111", "stroke-width": .2 }, b);
+    el("circle", { r: .35, fill: "#111" }, b);
+    makeDraggable(b, state.ball);
+  }
+  renderSide();
+}
+// Pixel-art shirts, one sprite per facing. K outline, B kit colour, S sleeves, C cuffs,
+// T trim (collar, hem), H shine, W badge. West-facing sprites are mirrors of east-facing ones.
+const KIT_SPRITES = {
+  N: [ // back of the shirt
+    ".....KKKKKKKK.....",
+    "...KKTTTTTTTTKK...",
+    "..KSBBBBBBBBBBSK..",
+    ".KSSBBBBBBBBBBSSK.",
+    "KSSSBBBBBBBBBBSSSK",
+    "KCCSBBBBBBBBBBSCCK",
+    "KKKKBBBBBBBBBBKKKK",
+    "...KHBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KTTTTTTTTTTK...",
+    "...KKKKKKKKKKKK...",
+  ],
+  NE: [ // back, turned three-quarters to the right: near sleeve full, far sleeve shorter
+    "......KKKKKKKK....",
+    "....KKTTTTTTTTKK..",
+    "...KSBBBBBBBBBSK..",
+    "..KSSBBBBBBBBBSSK.",
+    ".KSSSBBBBBBBBBSSK.",
+    ".KCCSBBBBBBBBBCCK.",
+    ".KKKKBBBBBBBBBKKK.",
+    "....KHBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KTTTTTTTTTK...",
+    "....KKKKKKKKKKK...",
+  ],
+  E: [ // side on, facing right
+    "......KKKKKK......",
+    ".....KTTTTTTK.....",
+    "....KBBBBBBTTK....",
+    "....KBBBKSSSSK....",
+    "....KBBBKSSSSSK...",
+    "....KBBBBKSSSSK...",
+    "....KBBBBKCCCCK...",
+    "....KHBBBBKKKKK...",
+    "....KBBBBBBBBK....",
+    "....KBBBBBBBBK....",
+    "....KBBBBBBBBK....",
+    "....KBBBBBBBBK....",
+    "....KTTTTTTTTK....",
+    "....KKKKKKKKKK....",
+  ],
+  SE: [ // front, turned three-quarters to the right
+    "......KKKKKKKK....",
+    "....KKTTKKKKTTKK..",
+    "...KSBBBBTKKTBSK..",
+    "..KSSBBBBBTTBBSSK.",
+    ".KSSSBBBBBBBWBSSK.",
+    ".KCCSBBBBBBBBBCCK.",
+    ".KKKKBBBBBBBBBKKK.",
+    "....KHBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KBBBBBBBBBK...",
+    "....KTTTTTTTTTK...",
+    "....KKKKKKKKKKK...",
+  ],
+  S: [ // front of the shirt: V-neck and badge
+    ".....KKKKKKKK.....",
+    "...KKTTKKKKTTKK...",
+    "..KSBBBTKKTBBBSK..",
+    ".KSSBBBBTTBBBBSSK.",
+    "KSSSBBBBBBBWBBSSSK",
+    "KCCSBBBBBBBBBBSCCK",
+    "KKKKBBBBBBBBBBKKKK",
+    "...KHBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KBBBBBBBBBBK...",
+    "...KTTTTTTTTTTK...",
+    "...KKKKKKKKKKKK...",
+  ],
+};
+const mirror = rows => rows.map(r => [...r].reverse().join(""));
+KIT_SPRITES.W = mirror(KIT_SPRITES.E);
+KIT_SPRITES.SW = mirror(KIT_SPRITES.SE);
+KIT_SPRITES.NW = mirror(KIT_SPRITES.NE);
+// Screen directions in 45° steps, clockwise from east (screen y points down)
+const DIRS = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"];
+// Where the number sits on each sprite: horizontal nudge, baseline, size scale
+const NUMBER_SPOT = { N: [0, 1.35, 1], S: [0, 1.5, .9], NE: [.17, 1.4, .92], SE: [.17, 1.5, .85], E: [0, 1.8, .72] };
+NUMBER_SPOT.W = NUMBER_SPOT.E;
+NUMBER_SPOT.NW = [-.17, 1.4, .92];
+NUMBER_SPOT.SW = [-.17, 1.5, .85];
+
+const PX = .34, KIT_W = 18 * PX, KIT_H = 14 * PX;
+const ICON_SCALE = .625; // shirts are drawn at 5/8 of their full sprite size on the pitch
+(function buildKitSymbols() {
+  const defs = svg.querySelector("defs");
+  // Each layer merges runs of matching pixels into one rect so no seams show between pixels
+  const layers = [["BTHW", "currentColor"], ["SC", "var(--sleeve, currentColor)"], ["TC", "rgba(0,0,0,.32)"],
+    ["H", "rgba(255,255,255,.45)"], ["W", "#f1e2a6"], ["K", "#14110f"]];
+  for (const [dir, art] of Object.entries(KIT_SPRITES)) {
+    const sym = el("symbol", { id: "kit-" + dir, viewBox: "0 0 18 14", "shape-rendering": "crispEdges" }, defs);
+    for (const [chars, fill] of layers) art.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        if (!chars.includes(row[x])) continue;
+        let w = 1; while (chars.includes(row[x + w])) w++;
+        el("rect", { x, y, width: w, height: 1, style: `fill:${fill}` }, sym);
+        x += w - 1;
+      }
+    });
+  }
+})();
+
+// Which way a player faces: towards the ball, or towards the opposition goal when the ball is hidden
+function facing(p) {
+  const dx = state.ball.y - p.y, dy = p.x - state.ball.x; // screen offsets of the ball from the player
+  if (!state.showBall || Math.hypot(dx, dy) < 0.4) return p.side === "home" ? "N" : "S";
+  const sector = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+  return DIRS[(sector + 8) % 8];
+}
+
+const kitNodes = new Map(); // player id → { shadow, kit, num, dir }
+function setFacing(p) {
+  const n = kitNodes.get(p.id); if (!n) return;
+  const dir = facing(p); if (dir === n.dir) return;
+  n.dir = dir;
+  n.shadow.setAttribute("href", "#kit-" + dir);
+  n.kit.setAttribute("href", "#kit-" + dir);
+  const [nx, ny, scale] = NUMBER_SPOT[dir];
+  n.num.setAttribute("x", nx);
+  n.num.setAttribute("y", ny);
+  n.num.setAttribute("font-size", (p.num.length > 1 ? 1.45 : 1.75) * scale);
+  // The number is printed on the back, so only show it when the back is in view
+  n.num.style.display = dir.startsWith("N") ? "" : "none";
+}
+function updateFacings() { for (const side of ["home", "away"]) state[side].players.forEach(setFacing); }
+
+function drawPlayer(p) {
+  const g = el("g", { class: "player", "data-id": p.id, transform: place(p), tabindex: 0, role: "button", "aria-label": `${p.num} ${p.name || p.pos}` }, gPlayers);
+  const home = p.side === "home", keeper = p.pos === "GK";
+  // Invisible touch target, so the smaller shirts are still easy to grab with a finger
+  el("circle", { r: 2.6, fill: "transparent" }, g);
+  const icon = el("g", { transform: `scale(${ICON_SCALE})` }, g);
+  if (selected === p.id) el("rect", { x: -KIT_W / 2 - .7, y: -KIT_H / 2 - .7, width: KIT_W + 1.4, height: KIT_H + 1.4, fill: "none",
+    stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, icon);
+  const shadow = el("use", { x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, icon);
+  const kit = el("use", { x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: keeper ? `color:var(--${p.side}-gk)` : `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, icon);
+  const num = el("text", { "text-anchor": "middle", fill: home || keeper ? "#fff" : "#14110f", "font-family": "'Press Start 2P', monospace" }, icon);
+  num.textContent = p.num;
+  const lt = el("text", { y: KIT_H * ICON_SCALE / 2 + 1.5, "text-anchor": "middle", "font-size": 1.15, fill: "#fff", "font-family": "'Silkscreen', monospace",
+    stroke: "rgba(0,0,0,.6)", "stroke-width": .35, "paint-order": "stroke" }, g);
+  lt.textContent = (knownAs(p.name) || p.pos).toUpperCase();
+  kitNodes.set(p.id, { g, shadow, kit, num, dir: null });
+  setFacing(p);
+  makeDraggable(g, p);
+  g.addEventListener("keydown", e => { if (e.key === "Enter") select(p.id); });
+}
+
+function makeDraggable(g, obj) {
+  g.addEventListener("pointerdown", e => {
+    if (tool !== "move" || matchActive) return;
+    e.stopPropagation(); g.setPointerCapture(e.pointerId); g.classList.add("dragging");
+    const start = toPitch(e), ox = obj.x, oy = obj.y; let moved = false;
+    const move = ev => {
+      const p = toPitch(ev); obj.x = ox + p.x - start.x; obj.y = oy + p.y - start.y;
+      if (Math.hypot(p.x - start.x, p.y - start.y) > .4) moved = true;
+      g.setAttribute("transform", place(obj));
+      if (obj.id) setFacing(obj); else updateFacings(); // a player turns to the ball; moving the ball turns everyone
+    };
+    const up = () => {
+      g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up);
+      g.classList.remove("dragging");
+      if (!moved && obj.id) select(obj.id); else render();
+    };
+    g.addEventListener("pointermove", move); g.addEventListener("pointerup", up);
+  });
+}
+
+// Arrow drawing
+let draft = null;
+svg.addEventListener("pointerdown", e => {
+  if (matchActive) return;
+  if (tool === "move") { if (selected) { selected = null; render(); } return; }
+  svg.setPointerCapture(e.pointerId);
+  const p = toPitch(e);
+  draft = { type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+  draft.node = el("line", { x1: p.x, y1: p.y, x2: p.x, y2: p.y, stroke: tool === "pass" ? "#fff" : "var(--run)", "stroke-width": .45,
+    "stroke-dasharray": tool === "run" ? "1.2 .8" : "none", "marker-end": `url(#head-${tool})`, opacity: .7 }, gArrows);
+});
+svg.addEventListener("pointermove", e => {
+  if (!draft) return;
+  const p = toPitch(e); draft.x2 = p.x; draft.y2 = p.y;
+  draft.node.setAttribute("x2", p.x); draft.node.setAttribute("y2", p.y);
+});
+svg.addEventListener("pointerup", () => {
+  if (!draft) return;
+  const { node, ...a } = draft; draft = null;
+  if (Math.hypot(a.x2 - a.x1, a.y2 - a.y1) > 2) state.arrows.push(a);
+  render();
+});
+
+function select(id) {
+  if (matchActive) return;
+  selected = id; render();
+  const p = findPlayer(id); if (!p) return;
+  document.getElementById("editor").hidden = false;
+  document.getElementById("ed-num").value = p.num;
+  document.getElementById("ed-pos").value = p.pos;
+  document.getElementById("ed-name").value = p.name;
+}
+function findPlayer(id) { return [...state.home.players, ...state.away.players].find(p => p.id === id); }
+for (const [field, key] of [["ed-num","num"],["ed-pos","pos"],["ed-name","name"]]) {
+  document.getElementById(field).addEventListener("input", e => {
+    const p = findPlayer(selected); if (!p) return;
+    p[key] = key === "pos" ? e.target.value.toUpperCase() : e.target.value; render();
+  });
+}
+
+// Pixel star, 9×9: K black outline, F fill (tier colour), H highlight, E empty interior
+const PIXEL_STAR = [
+  "....K....",
+  "...KFK...",
+  "KKKKHKKKK",
+  "KFHFFFFFK",
+  ".KFFFFFK.",
+  "..KFFFK..",
+  ".KFFKFFK.",
+  ".KFK.KFK.",
+  ".KK...KK.",
+];
+(function buildStarSymbols() {
+  const host = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  host.setAttribute("width", 0); host.setAttribute("height", 0); host.style.position = "absolute";
+  const defs = document.createElementNS(host.namespaceURI, "defs"); host.appendChild(defs);
+  const make = (id, colours) => {
+    const sym = document.createElementNS(host.namespaceURI, "symbol");
+    sym.id = id; sym.setAttribute("viewBox", "0 0 9 9"); sym.setAttribute("shape-rendering", "crispEdges");
+    PIXEL_STAR.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (!colours[ch]) return;
+      const px = document.createElementNS(host.namespaceURI, "rect");
+      px.setAttribute("x", x); px.setAttribute("y", y); px.setAttribute("width", 1.02); px.setAttribute("height", 1.02);
+      px.setAttribute("fill", colours[ch]); sym.appendChild(px);
+    }));
+    defs.appendChild(sym);
+  };
+  make("px-star-empty", { K: "#000", F: "#262a4d", H: "#262a4d" });
+  make("px-star-full", { K: "#000", F: "currentColor", H: "#fff8dc" });
+  document.body.prepend(host);
+})();
+// Five pixel stars; a half star is filled on its left half only
+function starsSvg(st) {
+  const tier = st >= 3.5 ? "gold" : st >= 2.5 ? "silver" : "bronze";
+  let out = `<svg class="stars ${tier}" viewBox="0 0 49 9" role="img" aria-label="${st} out of 5 stars"><title>${st} / 5</title>`;
+  for (let i = 0; i < 5; i++) {
+    const x = i * 10, fill = Math.max(0, Math.min(1, st - i));
+    out += `<use href="#px-star-empty" x="${x}" width="9" height="9"/>`;
+    if (fill > 0) out += `<svg x="${x}" width="${fill === 1 ? 9 : 5}" height="9" viewBox="0 0 ${fill === 1 ? 9 : 5} 9"><use href="#px-star-full" width="9" height="9"/></svg>`;
+  }
+  return out + "</svg>";
+}
+
+// Star rating out of 5 from the overall rating, in half-star steps every 4 points
+const STAR_BANDS = [[87, 5], [83, 4.5], [79, 4], [75, 3.5], [71, 3], [67, 2.5], [63, 2], [59, 1.5], [55, 1]];
+const starsFor = ovr => (STAR_BANDS.find(([min]) => (ovr || 0) >= min) || [0, 0.5])[1];
+
+// Stamina bar: moves in 10% steps, from bright green through lime, yellow and orange to red
+const STAMINA_COLOURS = [[90, "#2fe36b"], [70, "#a8e33a"], [50, "#f2d43a"], [30, "#f28c35"], [0, "#e5484d"]];
+function paintStamina(card, energy) {
+  const bar = card.querySelector(".stamina"); if (!bar) return;
+  const step = Math.max(0, Math.ceil(energy / 10) * 10);
+  if (bar.dataset.step === String(step)) return;
+  bar.dataset.step = step;
+  const colour = STAMINA_COLOURS.find(([min]) => step >= min)[1];
+  const fill = bar.querySelector("b");
+  fill.style.width = `${step}%`; fill.style.background = colour;
+  bar.title = `Stamina ${step}%`;
+}
+function updateStaminaBars() {
+  for (const p of [...state.home.players, ...state.away.players]) {
+    const card = document.querySelector(`.card[data-key="${p.id}"]`);
+    if (card) paintStamina(card, p.energy ?? 100);
+  }
+}
+// The name a player is known by: their shirt name without any leading initials ("M.Bizot" -> "Bizot")
+const knownAs = name => (name || "").replace(/^(\p{Lu}\.\s*)+/u, "").trim() || name || "";
+
+function playerCard(num, name, pos, ovr, opts) {
+  const d = document.createElement("div");
+  d.className = "card" + (opts.sel ? " sel" : "") + (pos === "GK" ? " keeper" : "");
+  d.dataset.kind = opts.kind; d.dataset.key = opts.key;
+  d.innerHTML = `<span class="pos"></span><span class="nm"></span>${starsSvg(starsFor(ovr))}`;
+  d.querySelector(".nm").textContent = name || "—";
+  d.querySelector(".pos").textContent = pos;
+  if (opts.kind.startsWith("away")) { d.classList.add("away"); if (opts.onTap) d.addEventListener("click", opts.onTap); }
+  else makeCardDraggable(d, opts.onTap);
+  return d;
+}
+const avgOvr = team => {
+  const r = team.players.map(p => p.ovr).filter(Boolean);
+  return r.length ? Math.round(r.reduce((a, b) => a + b, 0) / r.length) : null;
+};
+function benchOf(team) {
+  if (!team.club) return [];
+  const squad = squadOf(team.club);
+  const onPitch = new Set(team.players.map(p => p.pid));
+  const named = team.bench ?? pickBench(squad, squad.filter(pl => onPitch.has(pl.pid)), benchSize(team.club)).map(pl => pl.pid);
+  return squad.filter(pl => named.includes(pl.pid) && !onPitch.has(pl.pid))
+    .sort((a, b) => POS_ORDER.indexOf(a.natural) - POS_ORDER.indexOf(b.natural) || b.ovr - a.ovr);
+}
+function renderSide() {
+  // The panel always shows your team: the starting XI, then the bench
+  const team = state.home;
+  const r = document.getElementById("roster"); r.replaceChildren();
+  for (const p of team.players) r.appendChild(playerCard(p.num, knownAs(p.name), p.pos, p.ovr,
+    { kind: "xi", key: p.id, sel: p.id === selected, energy: p.energy, onTap: () => select(p.id) }));
+
+  const awayList = document.getElementById("away-roster"); awayList.replaceChildren();
+  for (const p of state.away.players) awayList.appendChild(playerCard(p.num, knownAs(p.name), p.pos, p.ovr,
+    { kind: "away", key: p.id, sel: p.id === selected, onTap: () => select(p.id) }));
+  const awayBench = document.getElementById("away-bench"); awayBench.replaceChildren();
+  for (const pl of benchOf(state.away)) awayBench.appendChild(playerCard(pl.num, knownAs(pl.name), pl.natural, pl.ovr,
+    { kind: "away-bench", key: pl.pid }));
+
+  const bench = document.getElementById("bench"); bench.replaceChildren();
+  const subs = benchOf(team);
+  for (const pl of subs) bench.appendChild(playerCard(pl.num, knownAs(pl.name), pl.natural, pl.ovr,
+    { kind: "bench", key: pl.pid, onTap: () => substitute(pl) }));
+  if (!selected) document.getElementById("editor").hidden = true;
+  updateScoreboard();
+  if (typeof updateMatchUI === "function") updateMatchUI();
+  document.getElementById("home-formation").value = state.home.formation;
+  document.getElementById("away-formation").value = state.away.formation;
+  for (const s of ["home", "away"]) {
+    const box = document.getElementById(s + "-club");
+    if (document.activeElement !== box) box.value = state[s].club || state[s].name;
+  }
+}
+
+function substitute(pl, out = findPlayer(selected)) {
+  if (!out || out.side !== "home") { toast("Drag the sub onto the player they're replacing"); return; }
+  const off = out.name, offPid = out.pid;
+  const team = state[out.side];
+  // The sub leaves the bench. Before kick-off the dropped starter takes his place on the bench;
+  // during a match a substituted player is out of the game.
+  team.bench = (team.bench || benchOf(team).map(b => b.pid)).filter(id => id !== pl.pid);
+  if (offPid != null) {
+    if (matchActive) (team.subbedOff ||= []).push(offPid); else team.bench.push(offPid);
+  }
+  Object.assign(out, fromDb(pl));
+  out.energy = 100; // fresh legs
+  if (matchActive) addEvent(`${minute()}' Substitution: ${pl.name} on for ${off}.`);
+  toast(`${pl.name} on for ${off}`);
+  render();
+}
+// Swap two starters: each takes the other's place in the formation
+function swapPlayers(a, b) {
+  if (a === b) return;
+  const keys = ["pid", "name", "full", "num", "energy", ...RATINGS];
+  for (const k of keys) [a[k], b[k]] = [b[k], a[k]];
+  toast(`${a.name} and ${b.name} swapped`);
+  render();
+}
+
+// Drag a card (or tap it). Mouse drags start after a small move; touch drags after a short press,
+// so a quick swipe still scrolls the panel.
+const ghost = document.getElementById("drag-ghost");
+let drag = null;
+function makeCardDraggable(card, onTap) {
+  card.addEventListener("pointerdown", e => {
+    if (e.button > 0) return;
+    const start = { x: e.clientX, y: e.clientY }, touch = e.pointerType !== "mouse";
+    let timer = null;
+    const begin = () => {
+      drag = { card, kind: card.dataset.kind, key: card.dataset.key, target: null };
+      ghost.replaceChildren(card.cloneNode(true)); ghost.hidden = false;
+      card.classList.add("drag-source");
+      moveGhost(start.x, start.y);
+      requestAnimationFrame(autoScroll);
+    };
+    if (touch) timer = setTimeout(begin, 180);
+    const move = ev => {
+      if (!drag) {
+        const far = Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6;
+        if (far && touch) { clearTimeout(timer); cleanup(); return; } // the finger is scrolling, not dragging
+        if (far) begin(); else return;
+      }
+      start.x = ev.clientX; start.y = ev.clientY;
+      moveGhost(ev.clientX, ev.clientY);
+    };
+    const up = ev => {
+      clearTimeout(timer);
+      if (drag) finishDrag(); else if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 6) onTap();
+      cleanup();
+    };
+    const cleanup = () => {
+      document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", cancel);
+    };
+    const cancel = () => { clearTimeout(timer); if (drag) endDrag(); cleanup(); };
+    document.addEventListener("pointermove", move); document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", cancel);
+  });
+}
+// While dragging on a touch screen, stop the page from scrolling under the finger
+document.addEventListener("touchmove", e => { if (drag) e.preventDefault(); }, { passive: false });
+
+// Scroll the panel while a card is held near its top or bottom edge
+const aside = document.querySelector("aside");
+function autoScroll() {
+  if (!drag) return;
+  const box = aside.getBoundingClientRect(), y = drag.y, edge = 70;
+  const inside = drag.x > box.left && drag.x < box.right;
+  const dy = !inside ? 0 : y < box.top + edge ? -(box.top + edge - y) / 4 : y > box.bottom - edge ? (y - box.bottom + edge) / 4 : 0;
+  if (dy) { aside.scrollTop += dy; moveGhost(drag.x, drag.y); }
+  requestAnimationFrame(autoScroll);
+}
+function moveGhost(x, y) {
+  drag.x = x; drag.y = y;
+  ghost.style.left = x + "px"; ghost.style.top = y + "px";
+  const hit = document.elementFromPoint(x, y);
+  const card = hit?.closest(".card");
+  const pitchPlayer = hit?.closest?.(".player[data-id]");
+  let target = null;
+  if (card && card !== drag.card && !card.dataset.kind.startsWith("away") && !(drag.kind === "bench" && card.dataset.kind === "bench")) target = card;
+  if (pitchPlayer && pitchPlayer.dataset.id.startsWith("home")) target = pitchPlayer;
+  if (drag.target && drag.target !== target) drag.target.classList.remove("drop-target");
+  if (target && target.classList.contains("card")) target.classList.add("drop-target");
+  drag.target = target;
+}
+function finishDrag() {
+  const { kind, key, target } = drag;
+  endDrag();
+  if (!target) return;
+  const team = state.home;
+  const targetKind = target.classList.contains("card") ? target.dataset.kind : "xi";
+  const targetKey = target.classList.contains("card") ? target.dataset.key : target.dataset.id;
+  const benchPlayer = k => benchOf(team).find(pl => String(pl.pid) === String(k));
+  if (kind === "bench" && targetKind === "xi") substitute(benchPlayer(key), findPlayer(targetKey));
+  else if (kind === "xi" && targetKind === "bench") substitute(benchPlayer(targetKey), findPlayer(key));
+  else if (kind === "xi" && targetKind === "xi") swapPlayers(findPlayer(key), findPlayer(targetKey));
+}
+function endDrag() {
+  if (drag?.target) drag.target.classList.remove("drop-target");
+  drag?.card.classList.remove("drag-source");
+  ghost.hidden = true; drag = null;
+}
+{ // club search list
+  const list = document.getElementById("club-list");
+  for (const [club, info] of Object.entries(DB.clubs)) list.appendChild(new Option(info.league, club));
+}
+
+// Controls
+for (const side of ["home","away"]) {
+  const s = document.getElementById(side + "-formation");
+  for (const f of Object.keys(FORMATIONS)) s.add(new Option(f, f));
+  s.addEventListener("change", e => applyFormation(side, e.target.value));
+  document.getElementById(side + "-club").addEventListener("change", e => {
+    const club = e.target.value.trim();
+    if (DB.clubs[club]) { loadClub(side, club); toast(`${club} loaded`); e.target.blur(); document.getElementById(side + "-pop").hidden = true; }
+    else if (club) toast(`No club called "${club}". Pick one from the list.`);
+  });
+}
+// Tap a team name on the scoreboard to change its club or formation
+for (const side of ["home", "away"]) {
+  const btn = document.getElementById(side + "-team-btn"), pop = document.getElementById(side + "-pop");
+  btn.addEventListener("click", () => {
+    if (matchActive) { toast("Teams can be changed once the match is over"); return; }
+    const open = pop.hidden;
+    document.querySelectorAll(".popover").forEach(p => { p.hidden = true; });
+    pop.hidden = !open;
+  });
+}
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".sb-side")) document.querySelectorAll(".popover").forEach(p => { p.hidden = true; });
+});
+function updateScoreboard() {
+  const m = typeof match !== "undefined" && match.active ? match : null;
+  document.getElementById("sb-home-name").textContent = state.home.name;
+  document.getElementById("sb-away-name").textContent = state.away.name;
+  document.getElementById("sb-home-score").textContent = m ? m.score.home : 0;
+  document.getElementById("sb-away-score").textContent = m ? m.score.away : 0;
+  const secs = m ? Math.floor(m.clock) : 0;
+  document.getElementById("sb-clock").textContent = m?.over ? "FT"
+    : m && m.half === 2 && m.clock === 45 * 60 && m.pause > 0 ? "HT"
+    : `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+}
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+}
+
+startingState();
+render();
+</script>
+<script src="match.js"></script>
+</body>
+</html>
