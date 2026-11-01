@@ -139,6 +139,12 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
   body { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
   svg#pitch { max-height: none; }
 }
+#countdown {
+  font-family: var(--font-panel); font-size: 20px; fill: #fff; stroke: rgba(10,11,24,.75); stroke-width: .8px;
+  paint-order: stroke; pointer-events: none; transform-box: fill-box; transform-origin: center;
+}
+#countdown.pop { animation: countdown-pop .9s ease-out both; }
+@keyframes countdown-pop { 0% { transform: scale(1.7); opacity: 0; } 25% { opacity: 1; } 100% { transform: scale(1); opacity: .78; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -512,7 +518,7 @@ const ICON_SCALE = .625; // shirts are drawn at 5/8 of their full sprite size on
 // Which way a player faces: towards the ball, or towards the opposition goal when the ball is hidden
 function facing(p) {
   const dx = state.ball.y - p.y, dy = p.x - state.ball.x; // screen offsets of the ball from the player
-  if (!state.showBall || Math.hypot(dx, dy) < 1) return p.side === "home" ? "N" : "S";
+  if (!state.showBall || Math.hypot(dx, dy) < 0.4) return p.side === "home" ? "N" : "S";
   const sector = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
   return DIRS[(sector + 8) % 8];
 }

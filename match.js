@@ -65,6 +65,7 @@ function endMatch() {
     state.showAway = s.showAway; state.showBall = s.showBall; state.ball = { ...s.ball };
   }
   gArrows.style.display = "";
+  drawCountdown();
   render();
   updateMatchUI();
 }
@@ -89,6 +90,10 @@ function step(dt) {
     if (match.pause <= 0 && match.then) { const f = match.then; match.then = null; f(); }
     return;
   }
+  if (match.countdown > 0) {
+    match.countdown = Math.max(0, match.countdown - dt / match.speed);
+    return;
+  }
   match.clock += dt * CLOCK_RATE;
   if (match.half === 1 && match.clock >= 45 * 60) return halfTime();
   if (match.clock >= 90 * 60) return fullTime();
@@ -101,7 +106,7 @@ function step(dt) {
   tackles(dt);
 }
 
-function restart(delay, fn) { match.kickoffTo = null; match.owner = null; match.passTo = null; match.shot = null; match.pause = delay; match.then = fn; }
+function restart(delay, fn) { match.kickoffTo = null; match.countdown = 0; match.owner = null; match.passTo = null; match.shot = null; match.pause = delay; match.then = fn; }
 
 function halfTime() {
   match.half = 2; match.clock = 45 * 60;
@@ -119,6 +124,7 @@ function fullTime() {
 const scoreLine = () => `${state.home.name} ${match.score.home}–${match.score.away} ${state.away.name}`;
 
 const CIRCLE_R = 9.15; // centre circle radius in metres
+const COUNTDOWN = 3;   // real seconds of 3-2-1 before each kick-off
 const MIDFIELD = ["DM", "CM", "AM", "CDM", "CAM", "LM", "RM"];
 
 // Kick-off: the centre forward stands over the ball and plays it back to a central midfielder
@@ -146,12 +152,13 @@ function kickoff(side) {
     }
     p.x = x; p.y = y; p.cool = 0; p.dx = p.dy = undefined;
   }
-  taker.x = mid - d * 0.6; taker.y = 34;
+  taker.x = mid + d * 0.9; taker.y = 34; // just inside the opposition half, facing back over the ball
   receiver.x = mid - d * (CIRCLE_R + 0.6); receiver.y = 34;
-  Object.assign(state.ball, { x: mid, y: 34, vx: 0, vy: 0 });
   giveBall(taker);
+  Object.assign(state.ball, { x: mid, y: 34, vx: 0, vy: 0 });
   match.kickoffTo = receiver;
-  match.decide = 0.7;
+  match.decide = 0;
+  match.countdown = COUNTDOWN;
 }
 
 function giveBall(p) {
@@ -170,6 +177,7 @@ function release(p) {
 // ---------- ball ----------
 function moveBall(dt) {
   const b = state.ball;
+  if (match.owner && match.kickoffTo) return; // the ball waits on the centre spot
   if (match.owner) {
     const o = match.owner, d = dirOf(o.side);
     b.x = clamp(o.x + d * 0.9, 0.2, PITCH_L - 0.2); b.y = o.y;
@@ -417,7 +425,24 @@ function shoot(c) {
 }
 
 // ---------- drawing and panel ----------
+// Big 3-2-1 over the centre spot, popping in as each number changes
+function drawCountdown() {
+  let t = document.getElementById("countdown");
+  if (!t) {
+    t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.id = "countdown";
+    t.setAttribute("x", PITCH_W / 2); t.setAttribute("y", PITCH_L / 2 + 6.5);
+    t.setAttribute("text-anchor", "middle");
+    document.getElementById("pitch").appendChild(t);
+  }
+  const n = match.active && match.countdown > 0 ? String(Math.ceil(match.countdown)) : "";
+  if (t.textContent !== n) {
+    t.textContent = n;
+    t.classList.remove("pop"); void t.getBBox(); if (n) t.classList.add("pop");
+  }
+}
 function sync() {
+  drawCountdown();
   for (const p of everyone()) {
     const n = kitNodes.get(p.id);
     if (n) { n.g.setAttribute("transform", place(p)); setFacing(p); }
