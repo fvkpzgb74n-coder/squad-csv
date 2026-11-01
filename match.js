@@ -496,25 +496,29 @@ function drawCountdown() {
     t.classList.remove("pop"); void t.getBBox(); if (n) t.classList.add("pop");
   }
 }
-// Breath puffs: tired players puff out little pixel clouds from the top right of their shirt.
-// Puffs start below 70% stamina and grow bigger and more frequent as the player tires.
-const BREATH_FROM = 70, BREATH_FULL = 25;  // stamina where puffs start, and where they are at their most
-const PUFF_LIFE = 900;                     // ms a puff takes to drift away and fade
-const PUFF_ART = [ // W white, S soft shade, O grey outline so the puff reads on grass
-  "..OOO..",
-  ".OWWWO.",
-  "OWWWWSO",
-  "OWWWSSO",
-  ".OSSSO.",
-  "..OOO..",
+// Breath bubbles: a tired player gets a little pixel cloud speech bubble at the top right of their
+// shirt that moves with them. Each breath pops the bubble up and fades it; below 70% stamina the
+// breaths come more often and the bubble grows as the player tires.
+const BREATH_FROM = 70, BREATH_FULL = 25;  // stamina where bubbles start, and where they are at their most
+const PUFF_ART = [ // W white, S soft shade, O grey outline; the dots bottom-left trail down to the shirt
+  "...OOO.OOO.",
+  "..OWWWOWWWO",
+  ".OWWWWWWWWO",
+  "OWWWWWWWWWO",
+  "OWWWWWWWWSO",
+  ".OWWWWWSSO.",
+  "..OOOOOOO..",
+  ".OWO.......",
+  "O..........",
 ];
+const PUFF_W = 11, PUFF_H = 9, PUFF_SIZE = 2.4; // pixel grid, and drawn width in metres at normal size
 const puffs = [];
 function puffSymbol() {
   if (document.getElementById("px-puff")) return;
   const NS = "http://www.w3.org/2000/svg", sym = document.createElementNS(NS, "symbol");
-  sym.id = "px-puff"; sym.setAttribute("viewBox", "0 0 7 6"); sym.setAttribute("shape-rendering", "crispEdges");
+  sym.id = "px-puff"; sym.setAttribute("viewBox", `0 0 ${PUFF_W} ${PUFF_H}`); sym.setAttribute("shape-rendering", "crispEdges");
   PUFF_ART.forEach((row, y) => [...row].forEach((ch, x) => {
-    const fill = { W: "#ffffff", S: "#d4dbe8", O: "#7d8aa3" }[ch];
+    const fill = { W: "#ffffff", S: "#d4dbe8", O: "#5d6884" }[ch];
     if (!fill) return;
     const r = document.createElementNS(NS, "rect");
     r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1.02); r.setAttribute("height", 1.02);
@@ -529,26 +533,30 @@ function breathe(now) {
     const e = p.energy ?? 100;
     if (e > BREATH_FROM) { p.nextPuff = null; continue; }
     const t = clamp((BREATH_FROM - e) / (BREATH_FROM - BREATH_FULL), 0, 1); // 0 = just tiring, 1 = exhausted
-    const every = (1.8 - t * 1.45) * 1000;                                  // 1.8s down to 0.35s between puffs
+    const every = (1.8 - t * 1.45) * 1000;                                  // 1.8s down to 0.35s between breaths
     if (p.nextPuff == null) p.nextPuff = now + Math.random() * every;
     if (now < p.nextPuff) continue;
     p.nextPuff = now + every * (0.8 + Math.random() * 0.4);
-    // top-right corner of the shirt, in screen coordinates
-    const x = p.y * DRAW_SCALE + KIT_W * ICON_SCALE / 2 - 0.3, y = PITCH_L - p.x - KIT_H * ICON_SCALE / 2 + 0.3;
+    if (p.bubble) { p.bubble.el.remove(); puffs.splice(puffs.indexOf(p.bubble), 1); } // one bubble per player
     const el = document.createElementNS("http://www.w3.org/2000/svg", "use");
-    el.setAttribute("href", "#px-puff"); el.setAttribute("width", 1.4); el.setAttribute("height", 1.2);
+    el.setAttribute("href", "#px-puff"); el.setAttribute("width", PUFF_SIZE); el.setAttribute("height", PUFF_SIZE * PUFF_H / PUFF_W);
     layer.appendChild(el);
-    puffs.push({ el, born: now, x, y, size: 0.9 + t * 1.1 }); // up to about twice the size when exhausted
+    p.bubble = { el, p, born: now, life: clamp(every * 0.9, 320, 1100), size: 0.8 + t * 0.9 }; // up to ~2x when exhausted
+    puffs.push(p.bubble);
   }
   for (let i = puffs.length - 1; i >= 0; i--) {
-    const f = puffs[i], age = (now - f.born) / PUFF_LIFE;
-    if (age >= 1) { f.el.remove(); puffs.splice(i, 1); continue; }
-    const s = f.size * (0.6 + age * 0.7);
-    f.el.setAttribute("transform", `translate(${f.x + age * 1.3} ${f.y - age * 1.5}) scale(${s})`);
-    f.el.setAttribute("opacity", (age < 0.4 ? 1 : 1 - (age - 0.4) / 0.6).toFixed(2)); // solid, then fade
+    const f = puffs[i], age = (now - f.born) / f.life;
+    if (age >= 1) { f.el.remove(); puffs.splice(i, 1); if (f.p.bubble === f) f.p.bubble = null; continue; }
+    // pop in quickly, hold, then fade; anchored by its bottom-left tail to the shirt's top-right corner
+    const pop = age < 0.15 ? 0.6 + (age / 0.15) * 0.4 : 1;
+    const s = f.size * pop;
+    const ax = f.p.y * DRAW_SCALE + KIT_W * ICON_SCALE / 2 - 0.4;
+    const ay = PITCH_L - f.p.x - KIT_H * ICON_SCALE / 2 + 0.4 - age * 0.5;
+    f.el.setAttribute("transform", `translate(${ax} ${ay - PUFF_SIZE * PUFF_H / PUFF_W * s}) scale(${s})`);
+    f.el.setAttribute("opacity", (age < 0.55 ? 1 : 1 - (age - 0.55) / 0.45).toFixed(2));
   }
 }
-function clearPuffs() { for (const f of puffs) f.el.remove(); puffs.length = 0; for (const p of everyone()) p.nextPuff = null; }
+function clearPuffs() { for (const f of puffs) f.el.remove(); puffs.length = 0; for (const p of everyone()) { p.nextPuff = null; p.bubble = null; } }
 
 function sync() {
   drawCountdown();
