@@ -6,7 +6,7 @@
 <title>Tactics Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Press+Start+2P&family=Silkscreen&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Layout: pitch fills the left, a slim control rail on the right; stacks on phones. Single dark "floodlit stadium" world. */
 :root {
@@ -238,17 +238,51 @@ function render() {
   }
   renderSide();
 }
+// Pixel-art shirt, seen from behind. K outline, B kit colour, T trim (collar, cuffs, hem), H shine.
+const KIT_ART = [
+  "....KKKKKKKK....",
+  "..KKTTTTTTTTKK..",
+  ".KBHBBBBBBBBBBK.",
+  "KBHBBBBBBBBBBBBK",
+  "KBBBBBBBBBBBBBBK",
+  "KTTBBBBBBBBBBTTK",
+  "KKKBBBBBBBBBBKKK",
+  "..KHBBBBBBBBBK..",
+  "..KBBBBBBBBBBK..",
+  "..KBBBBBBBBBBK..",
+  "..KBBBBBBBBBBK..",
+  "..KBBBBBBBBBBK..",
+  "..KTTTTTTTTTTK..",
+  "..KKKKKKKKKKKK..",
+];
+const PX = .36, KIT_W = 16 * PX, KIT_H = 14 * PX;
+(function buildKitSymbol() {
+  const sym = el("symbol", { id: "kit", viewBox: "0 0 16 14", "shape-rendering": "crispEdges" }, svg.querySelector("defs"));
+  // Each layer merges runs of matching pixels into one rect so no seams show between pixels
+  const layers = [["BTH", "currentColor"], ["T", "rgba(0,0,0,.32)"], ["H", "rgba(255,255,255,.45)"], ["K", "#14110f"]];
+  for (const [chars, fill] of layers) KIT_ART.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      if (!chars.includes(row[x])) continue;
+      let w = 1; while (chars.includes(row[x + w])) w++;
+      el("rect", { x, y, width: w, height: 1, fill }, sym);
+      x += w - 1;
+    }
+  });
+})();
+
 function drawPlayer(p) {
   const g = el("g", { class: "player", transform: place(p), tabindex: 0, role: "button", "aria-label": `${p.num} ${p.name || p.pos}` }, gPlayers);
-  const col = p.side === "home" ? "var(--home)" : "var(--away)";
-  if (selected === p.id) el("circle", { r: 3, fill: "none", stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, g);
-  el("circle", { r: 2.1, fill: col, stroke: "#0b0f0c", "stroke-width": .3 }, g);
-  const t = el("text", { y: .75, "text-anchor": "middle", "font-size": 2.1, "font-weight": 600, fill: "#0b0f0c", "font-family": "IBM Plex Sans, sans-serif" }, g);
+  const home = p.side === "home";
+  if (selected === p.id) el("rect", { x: -KIT_W / 2 - .7, y: -KIT_H / 2 - .7, width: KIT_W + 1.4, height: KIT_H + 1.4, fill: "none",
+    stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, g);
+  el("use", { href: "#kit", x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, g);
+  el("use", { href: "#kit", x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: `color:var(--${p.side})` }, g);
+  const t = el("text", { y: 1.35, "text-anchor": "middle", "font-size": p.num.length > 1 ? 1.45 : 1.75,
+    fill: home ? "#14110f" : "#fff", "font-family": "'Press Start 2P', monospace" }, g);
   t.textContent = p.num;
-  const label = p.name || p.pos;
-  const lt = el("text", { y: 4.6, "text-anchor": "middle", "font-size": 1.7, fill: "#fff", "font-family": "IBM Plex Sans, sans-serif",
-    stroke: "rgba(0,0,0,.55)", "stroke-width": .35, "paint-order": "stroke" }, g);
-  lt.textContent = label;
+  const lt = el("text", { y: KIT_H / 2 + 2, "text-anchor": "middle", "font-size": 1.5, fill: "#fff", "font-family": "'Silkscreen', monospace",
+    stroke: "rgba(0,0,0,.6)", "stroke-width": .4, "paint-order": "stroke" }, g);
+  lt.textContent = (p.name || p.pos).toUpperCase();
   makeDraggable(g, p);
   g.addEventListener("keydown", e => { if (e.key === "Enter") select(p.id); });
 }
