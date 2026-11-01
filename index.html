@@ -15,7 +15,9 @@
   --line: #2b3a30;
   --ink: #e9efe9;
   --muted: #93a598;
-  --home: #f2b632;
+  --home: #7a1e3c;          /* claret shirt */
+  --home-sleeve: #9ccff0;   /* pale blue sleeves */
+  --run: var(--home-sleeve);
   --away: #5aa7ff;
   --chalk: rgba(255,255,255,.82);
   --grass-a: #2f7a45;
@@ -50,7 +52,7 @@ button {
 }
 button:hover { border-color: var(--muted); }
 button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-:focus-visible { outline: 2px solid var(--home); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--home-sleeve); outline-offset: 2px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .team-pill { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 .hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; }
@@ -95,7 +97,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
           <rect x="5.25" width="5.25" height="68" fill="var(--grass-b)"/>
         </pattern>
         <marker id="head-pass" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#fff"/></marker>
-        <marker id="head-run" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--home)"/></marker>
+        <marker id="head-run" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--run)"/></marker>
       </defs>
       <rect x="-4" y="-4" width="76" height="113" fill="#25613a"/>
       <!-- model coords run along the length (x 0..105); rotate so x=105 is the top goal -->
@@ -128,7 +130,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 
 <aside>
   <section>
-    <h2><span class="team-pill" style="background:var(--home)"></span>Your team</h2>
+    <h2><span class="team-pill" style="background:linear-gradient(90deg,var(--home-sleeve) 0 25%,var(--home) 25% 75%,var(--home-sleeve) 75%)"></span>Your team</h2>
     <div class="row">
       <div><label for="home-formation">Formation</label><select id="home-formation"></select></div>
       <div><label for="home-name">Name</label><input type="text" id="home-name" value="Riverside FC"></div>
@@ -225,7 +227,7 @@ function render() {
   gPlayers.replaceChildren(); gArrows.replaceChildren();
   for (const a of state.arrows) {
     el("line", { x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2,
-      stroke: a.type === "pass" ? "#fff" : "var(--home)", "stroke-width": .45,
+      stroke: a.type === "pass" ? "#fff" : "var(--run)", "stroke-width": .45,
       "stroke-dasharray": a.type === "run" ? "1.2 .8" : "none", "marker-end": `url(#head-${a.type})`, "stroke-linecap": "round" }, gArrows);
   }
   const teams = state.showAway ? ["away", "home"] : ["home"];
@@ -238,13 +240,13 @@ function render() {
   }
   renderSide();
 }
-// Pixel-art shirt, seen from behind. K outline, B kit colour, T trim (collar, cuffs, hem), H shine.
+// Pixel-art shirt, seen from behind. K outline, B kit colour, S sleeves, T trim (collar, cuffs, hem), H shine.
 const KIT_ART = [
   "....KKKKKKKK....",
   "..KKTTTTTTTTKK..",
-  ".KBHBBBBBBBBBBK.",
-  "KBHBBBBBBBBBBBBK",
-  "KBBBBBBBBBBBBBBK",
+  ".KSBBBBBBBBBBSK.",
+  "KSSHBBBBBBBBBSSK",
+  "KSSBBBBBBBBBBSSK",
   "KTTBBBBBBBBBBTTK",
   "KKKBBBBBBBBBBKKK",
   "..KHBBBBBBBBBK..",
@@ -259,12 +261,12 @@ const PX = .36, KIT_W = 16 * PX, KIT_H = 14 * PX;
 (function buildKitSymbol() {
   const sym = el("symbol", { id: "kit", viewBox: "0 0 16 14", "shape-rendering": "crispEdges" }, svg.querySelector("defs"));
   // Each layer merges runs of matching pixels into one rect so no seams show between pixels
-  const layers = [["BTH", "currentColor"], ["T", "rgba(0,0,0,.32)"], ["H", "rgba(255,255,255,.45)"], ["K", "#14110f"]];
+  const layers = [["BTH", "currentColor"], ["S", "var(--sleeve, currentColor)"], ["T", "rgba(0,0,0,.32)"], ["H", "rgba(255,255,255,.45)"], ["K", "#14110f"]];
   for (const [chars, fill] of layers) KIT_ART.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
       if (!chars.includes(row[x])) continue;
       let w = 1; while (chars.includes(row[x + w])) w++;
-      el("rect", { x, y, width: w, height: 1, fill }, sym);
+      el("rect", { x, y, width: w, height: 1, style: `fill:${fill}` }, sym);
       x += w - 1;
     }
   });
@@ -276,9 +278,9 @@ function drawPlayer(p) {
   if (selected === p.id) el("rect", { x: -KIT_W / 2 - .7, y: -KIT_H / 2 - .7, width: KIT_W + 1.4, height: KIT_H + 1.4, fill: "none",
     stroke: "#fff", "stroke-width": .3, "stroke-dasharray": ".6 .4" }, g);
   el("use", { href: "#kit", x: -KIT_W / 2 + .45, y: -KIT_H / 2 + .5, width: KIT_W, height: KIT_H, style: "color:#000", opacity: .3 }, g);
-  el("use", { href: "#kit", x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: `color:var(--${p.side})` }, g);
+  el("use", { href: "#kit", x: -KIT_W / 2, y: -KIT_H / 2, width: KIT_W, height: KIT_H, style: `color:var(--${p.side});--sleeve:var(--${p.side}-sleeve, var(--${p.side}))` }, g);
   const t = el("text", { y: 1.35, "text-anchor": "middle", "font-size": p.num.length > 1 ? 1.45 : 1.75,
-    fill: home ? "#14110f" : "#fff", "font-family": "'Press Start 2P', monospace" }, g);
+    fill: home ? "var(--home-sleeve)" : "#fff", "font-family": "'Press Start 2P', monospace" }, g);
   t.textContent = p.num;
   const lt = el("text", { y: KIT_H / 2 + 2, "text-anchor": "middle", "font-size": 1.5, fill: "#fff", "font-family": "'Silkscreen', monospace",
     stroke: "rgba(0,0,0,.6)", "stroke-width": .4, "paint-order": "stroke" }, g);
@@ -313,7 +315,7 @@ svg.addEventListener("pointerdown", e => {
   svg.setPointerCapture(e.pointerId);
   const p = toPitch(e);
   draft = { type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
-  draft.node = el("line", { x1: p.x, y1: p.y, x2: p.x, y2: p.y, stroke: tool === "pass" ? "#fff" : "var(--home)", "stroke-width": .45,
+  draft.node = el("line", { x1: p.x, y1: p.y, x2: p.x, y2: p.y, stroke: tool === "pass" ? "#fff" : "var(--run)", "stroke-width": .45,
     "stroke-dasharray": tool === "run" ? "1.2 .8" : "none", "marker-end": `url(#head-${tool})`, opacity: .7 }, gArrows);
 });
 svg.addEventListener("pointermove", e => {
