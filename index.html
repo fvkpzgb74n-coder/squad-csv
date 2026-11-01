@@ -242,24 +242,24 @@ function render() {
 }
 // Pixel-art shirt, seen from behind. K outline, B kit colour, S sleeves, C cuffs, T trim (collar, cuffs, hem), H shine.
 const KIT_ART = [
-  "....KKKKKKKK....",
-  "..KKTTTTTTTTKK..",
-  ".KSSSBBBBBBSSSK.",
-  "KSSSSBBBBBBSSSSK",
-  "KSSSSBBBBBBSSSSK",
-  "KCCSSBBBBBBSSCCK",
-  "KKKBBBBBBBBBBKKK",
-  "..KHBBBBBBBBBK..",
-  "..KBBBBBBBBBBK..",
-  "..KBBBBBBBBBBK..",
-  "..KBBBBBBBBBBK..",
-  "..KBBBBBBBBBBK..",
-  "..KTTTTTTTTTTK..",
-  "..KKKKKKKKKKKK..",
-];
-const PX = .36, KIT_W = 16 * PX, KIT_H = 14 * PX;
+  ".....KKKKKKKK.....",
+  "...KKTTTTTTTTKK...",
+  "..KSBBBBBBBBBBSK..",
+  ".KSSBBBBBBBBBBSSK.",
+  "KSSSBBBBBBBBBBSSSK",
+  "KCCSBBBBBBBBBBSCCK",
+  "KKKKBBBBBBBBBBKKKK",
+  "...KHBBBBBBBBBK...",
+  "...KBBBBBBBBBBK...",
+  "...KBBBBBBBBBBK...",
+  "...KBBBBBBBBBBK...",
+  "...KBBBBBBBBBBK...",
+  "...KTTTTTTTTTTK...",
+  "...KKKKKKKKKKKK...",
+]
+const PX = .34, KIT_W = 18 * PX, KIT_H = 14 * PX;
 (function buildKitSymbol() {
-  const sym = el("symbol", { id: "kit", viewBox: "0 0 16 14", "shape-rendering": "crispEdges" }, svg.querySelector("defs"));
+  const sym = el("symbol", { id: "kit", viewBox: "0 0 18 14", "shape-rendering": "crispEdges" }, svg.querySelector("defs"));
   // Each layer merges runs of matching pixels into one rect so no seams show between pixels
   const layers = [["BTH", "currentColor"], ["SC", "var(--sleeve, currentColor)"], ["TC", "rgba(0,0,0,.32)"], ["H", "rgba(255,255,255,.45)"], ["K", "#14110f"]];
   for (const [chars, fill] of layers) KIT_ART.forEach((row, y) => {
