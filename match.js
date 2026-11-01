@@ -462,13 +462,9 @@ function sync() {
   if (ballNode) ballNode.setAttribute("transform", place(state.ball));
 }
 
+// Match events are kept for the record; goals also pop up as a banner
 function addEvent(text, big) {
   match.events.unshift({ text, big });
-  const list = document.getElementById("events");
-  const li = document.createElement("li");
-  li.textContent = text;
-  if (big) li.className = "big";
-  list.prepend(li);
   if (big) toast(text.replace(/^\d+' /, ""));
 }
 
@@ -480,8 +476,16 @@ function updateMatchUI() {
   document.getElementById("speed").hidden = !on || match.over;
   document.getElementById("speed").textContent = `${match.speed}×`;
   document.getElementById("end-match").hidden = !on || match.over;
-  document.getElementById("match-panel").hidden = !on && !match.events?.length;
-  if (!on && !match.events?.length) document.getElementById("events").replaceChildren();
+  document.getElementById("match-panel").hidden = !on;
+  if (on) {
+    const total = match.possTime.home + match.possTime.away;
+    const pct = total ? Math.round((match.possTime.home / total) * 100) : 50;
+    const set = (id, v) => { document.getElementById(id).textContent = v; };
+    set("st-poss-h", `${pct}%`); set("st-poss-a", `${100 - pct}%`);
+    document.getElementById("st-poss-bar").style.width = `${pct}%`;
+    set("st-shots-h", match.shots.home); set("st-shots-a", match.shots.away);
+    set("st-goals-h", match.score.home); set("st-goals-a", match.score.away);
+  }
   updateScoreboard();
 }
 

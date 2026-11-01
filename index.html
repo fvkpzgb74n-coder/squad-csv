@@ -61,8 +61,14 @@ button {
 button:hover { border-color: var(--muted); }
 button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
 button:disabled { opacity: .4; cursor: default; }
-.events { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 180px; overflow-y: auto; font-size: 17px; color: var(--muted); }
-.events li.big { color: var(--ink); }
+/* Match stats: your team on the left, the opposition on the right */
+.stats { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; row-gap: 6px; column-gap: 12px; font-size: 22px; }
+.stats .sv { font-variant-numeric: tabular-nums; }
+.stats .sv.h { text-align: left; }
+.stats .sv.a { text-align: right; }
+.stats .sl { color: var(--muted); font-size: 17px; text-align: center; }
+.poss-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--away); overflow: hidden; margin-bottom: 4px; }
+.poss-bar span { display: block; height: 100%; width: 50%; background: linear-gradient(90deg, var(--home-sleeve), var(--home)); transition: width .4s; }
 button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -222,7 +228,12 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 <aside>
   <section id="match-panel" hidden>
     <h2>Match</h2>
-    <ol class="events" id="events"></ol>
+    <div class="stats" id="stats">
+      <span class="sv h" id="st-poss-h">50%</span><span class="sl">Possession</span><span class="sv a" id="st-poss-a">50%</span>
+      <div class="poss-bar"><span id="st-poss-bar"></span></div>
+      <span class="sv h" id="st-shots-h">0</span><span class="sl">Shots</span><span class="sv a" id="st-shots-a">0</span>
+      <span class="sv h" id="st-goals-h">0</span><span class="sl">Goals</span><span class="sv a" id="st-goals-a">0</span>
+    </div>
   </section>
   <section id="editor" hidden>
     <h2>Selected player</h2>
