@@ -38,15 +38,16 @@ html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg); background-image: var(--wash); background-attachment: fixed;
   color: var(--ink); font-family: var(--font-body); font-size: 14px;
-  display: grid; grid-template-columns: minmax(0, 1fr) 640px; grid-template-rows: minmax(0, 1fr); gap: 16px; padding: 16px;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 16px; padding: 16px;
 }
-main { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+main { display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 0; width: 100%; }
 header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: .04em; text-transform: uppercase; margin: 0; }
 .score { color: var(--muted); font-variant-numeric: tabular-nums; }
 .toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
-.pitch-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.pitch-wrap { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
 svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 100px); touch-action: none; user-select: none; }
+aside[hidden] { display: none; }
 aside { font-family: var(--font-panel); font-size: 18px; letter-spacing: .02em; background: rgba(16, 18, 42, .85); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
 aside h2 { font-family: var(--font-panel); font-weight: 400; font-size: 20px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); margin: 0 0 8px; }
 label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
@@ -154,7 +155,7 @@ aside h2.right { text-align: right; }
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 5px; font-weight: 500; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
 @media (max-width: 1100px) {
-  body { grid-template-columns: minmax(0, 1fr) 560px; }
+  body { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 820px) {
   body { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
@@ -202,38 +203,40 @@ aside h2.right { text-align: right; }
     <datalist id="club-list"></datalist>
   </div>
   <div class="pitch-wrap">
-    <svg id="pitch" viewBox="-4 -4 76 113" aria-label="Football pitch, 68 by 105 metres, your team attacking upwards">
+    <svg id="pitch" viewBox="-4 -4 83 113" aria-label="Football pitch, 75 by 105 metres, your team attacking upwards">
       <defs>
-        <pattern id="stripes" width="10.5" height="68" patternUnits="userSpaceOnUse">
-          <rect width="5.25" height="68" fill="var(--grass-a)"/>
-          <rect x="5.25" width="5.25" height="68" fill="var(--grass-b)"/>
+        <pattern id="stripes" width="10.5" height="75" patternUnits="userSpaceOnUse">
+          <rect width="5.25" height="75" fill="var(--grass-a)"/>
+          <rect x="5.25" width="5.25" height="75" fill="var(--grass-b)"/>
         </pattern>
         <marker id="head-pass" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#fff"/></marker>
         <marker id="head-run" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--run)"/></marker>
       </defs>
-      <rect x="-4" y="-4" width="76" height="113" fill="#25613a"/>
+      <rect x="-4" y="-4" width="83" height="113" fill="#25613a"/>
+      <!-- Drawn 75 m wide (the widest the Laws allow). The match runs on a 68 m model, stretched across
+           the width when drawn (DRAW_SCALE), so markings stay true and players spread to fill it. -->
       <!-- model coords run along the length (x 0..105); rotate so x=105 is the top goal -->
       <g transform="matrix(0 -1 1 0 0 105)">
-      <rect width="105" height="68" fill="url(#stripes)"/>
+      <rect width="105" height="75" fill="url(#stripes)"/>
       <g fill="none" stroke="var(--chalk)" stroke-width=".25">
-        <rect width="105" height="68"/>
-        <line x1="52.5" y1="0" x2="52.5" y2="68"/>
-        <circle cx="52.5" cy="34" r="9.15"/>
-        <circle cx="52.5" cy="34" r=".4" fill="var(--chalk)"/>
+        <rect width="105" height="75"/>
+        <line x1="52.5" y1="0" x2="52.5" y2="75"/>
+        <circle cx="52.5" cy="37.5" r="9.15"/>
+        <circle cx="52.5" cy="37.5" r=".4" fill="var(--chalk)"/>
         <!-- penalty areas 16.5m deep, 40.32m wide -->
-        <rect x="0" y="13.84" width="16.5" height="40.32"/>
-        <rect x="88.5" y="13.84" width="16.5" height="40.32"/>
-        <rect x="0" y="24.84" width="5.5" height="18.32"/>
-        <rect x="99.5" y="24.84" width="5.5" height="18.32"/>
-        <circle cx="11" cy="34" r=".4" fill="var(--chalk)"/>
-        <circle cx="94" cy="34" r=".4" fill="var(--chalk)"/>
-        <path d="M16.5 26.69 A9.15 9.15 0 0 1 16.5 41.31"/>
-        <path d="M88.5 26.69 A9.15 9.15 0 0 0 88.5 41.31"/>
-        <rect x="-2" y="30.34" width="2" height="7.32"/>
-        <rect x="105" y="30.34" width="2" height="7.32"/>
-        <path d="M0 1 A1 1 0 0 0 1 0 M104 0 A1 1 0 0 0 105 1 M0 67 A1 1 0 0 1 1 68 M104 68 A1 1 0 0 1 105 67"/>
+        <rect x="0" y="17.34" width="16.5" height="40.32"/>
+        <rect x="88.5" y="17.34" width="16.5" height="40.32"/>
+        <rect x="0" y="28.34" width="5.5" height="18.32"/>
+        <rect x="99.5" y="28.34" width="5.5" height="18.32"/>
+        <circle cx="11" cy="37.5" r=".4" fill="var(--chalk)"/>
+        <circle cx="94" cy="37.5" r=".4" fill="var(--chalk)"/>
+        <path d="M16.5 30.19 A9.15 9.15 0 0 1 16.5 44.81"/>
+        <path d="M88.5 30.19 A9.15 9.15 0 0 0 88.5 44.81"/>
+        <rect x="-2" y="33.84" width="2" height="7.32"/>
+        <rect x="105" y="33.84" width="2" height="7.32"/>
+        <path d="M0 1 A1 1 0 0 0 1 0 M104 0 A1 1 0 0 0 105 1 M0 74 A1 1 0 0 1 1 75 M104 75 A1 1 0 0 1 105 74"/>
       </g>
-      <g id="arrows"></g>
+      <g id="arrows" transform="scale(1 1.102941)"></g>
       </g>
       <g id="players"></g>
       <g id="puffs" pointer-events="none"></g>
@@ -241,7 +244,7 @@ aside h2.right { text-align: right; }
   </div>
 </main>
 
-<aside>
+<aside hidden>
   <section id="match-panel">
     <h2>Match</h2>
     <div class="stats" id="stats">
@@ -460,11 +463,12 @@ function el(tag, attrs, parent) {
 function toPitch(evt) {
   const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
   const p = pt.matrixTransform(svg.getScreenCTM().inverse());
-  return { x: Math.max(-3, Math.min(108, 105 - p.y)), y: Math.max(-3, Math.min(71, p.x)) };
+  return { x: Math.max(-3, Math.min(108, 105 - p.y)), y: Math.max(-3, Math.min(71, p.x / DRAW_SCALE)) };
 }
 
 // Screen position for a model point: pitch is drawn vertically
-const place = o => `translate(${o.y} ${105 - o.x})`;
+const DRAW_W = 75, DRAW_SCALE = DRAW_W / 68; // drawn width, and how much the 68 m model is stretched across it
+const place = o => `translate(${o.y * DRAW_SCALE} ${105 - o.x})`;
 
 function render() {
   kitNodes.clear(); ballNode = null;

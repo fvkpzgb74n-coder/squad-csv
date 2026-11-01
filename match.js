@@ -486,7 +486,7 @@ function drawCountdown() {
   if (!t) {
     t = document.createElementNS("http://www.w3.org/2000/svg", "text");
     t.id = "countdown";
-    t.setAttribute("x", PITCH_W / 2); t.setAttribute("y", PITCH_L / 2 + 6.5);
+    t.setAttribute("x", DRAW_W / 2); t.setAttribute("y", PITCH_L / 2 + 6.5);
     t.setAttribute("text-anchor", "middle");
     document.getElementById("pitch").appendChild(t);
   }
@@ -534,7 +534,7 @@ function breathe(now) {
     if (now < p.nextPuff) continue;
     p.nextPuff = now + every * (0.8 + Math.random() * 0.4);
     // top-right corner of the shirt, in screen coordinates
-    const x = p.y + KIT_W * ICON_SCALE / 2 - 0.3, y = PITCH_L - p.x - KIT_H * ICON_SCALE / 2 + 0.3;
+    const x = p.y * DRAW_SCALE + KIT_W * ICON_SCALE / 2 - 0.3, y = PITCH_L - p.x - KIT_H * ICON_SCALE / 2 + 0.3;
     const el = document.createElementNS("http://www.w3.org/2000/svg", "use");
     el.setAttribute("href", "#px-puff"); el.setAttribute("width", 1.4); el.setAttribute("height", 1.2);
     layer.appendChild(el);
