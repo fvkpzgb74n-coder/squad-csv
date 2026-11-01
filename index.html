@@ -66,7 +66,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 /* Player cards: each one can be dragged onto another to make a sub or swap */
 .cards { display: grid; gap: 8px; }
 .card {
-  display: grid; grid-template-columns: 1fr auto auto 26px; align-items: center; gap: 10px;
+  display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px;
   background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 9px 12px;
   cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
@@ -82,7 +82,6 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card .stars .on::before { content: "★★★★★"; }
 .card .nm { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .pos { color: var(--muted); font-size: 12px; font-weight: 500; }
-.card .ovr { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; text-align: right; }
 #bench .card { background: transparent; }
 .panel-head { display: flex; align-items: baseline; justify-content: space-between; }
 button.link { background: none; border: none; padding: 0; color: var(--muted); font-size: 12px; text-decoration: underline; }
@@ -576,14 +575,13 @@ function playerCard(num, name, pos, ovr, opts) {
   const d = document.createElement("div");
   d.className = "card" + (opts.sel ? " sel" : "") + (pos === "GK" ? " keeper" : "");
   d.dataset.kind = opts.kind; d.dataset.key = opts.key;
-  d.innerHTML = `<span class="nm"></span><span class="pos"></span><span class="stars"><span class="on"></span></span><span class="ovr"></span>`;
+  d.innerHTML = `<span class="nm"></span><span class="pos"></span><span class="stars"><span class="on"></span></span>`;
   const st = starsFor(ovr);
   d.querySelector(".stars").setAttribute("aria-label", `${st} out of 5 stars`);
   d.querySelector(".stars").title = `${st} / 5`;
   d.querySelector(".stars .on").style.width = `${(st / 5) * 100}%`;
   d.querySelector(".nm").textContent = name || "—";
   d.querySelector(".pos").textContent = pos;
-  d.querySelector(".ovr").textContent = ovr ?? "";
   makeCardDraggable(d, opts.onTap);
   return d;
 }
