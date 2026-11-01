@@ -86,8 +86,6 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card .nm { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .pos { color: var(--muted); font-size: 12px; font-weight: 500; }
 #bench .card { background: transparent; }
-.panel-head { display: flex; align-items: baseline; justify-content: space-between; }
-button.link { background: none; border: none; padding: 0; color: var(--muted); font-size: 12px; text-decoration: underline; }
 .drag-ghost { position: fixed; z-index: 10; pointer-events: none; width: 260px; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 .setup { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .team-setup { display: flex; align-items: center; gap: 6px; }
@@ -197,12 +195,11 @@ button.link { background: none; border: none; padding: 0; color: var(--muted); f
     <div style="margin-top:8px"><label for="ed-name">Name</label><input type="text" id="ed-name" maxlength="20"></div>
   </section>
   <section>
-    <div class="panel-head"><h2 id="lineup-title">Line-up</h2><button class="link" id="copy">Copy</button></div>
+    <h2>Line-up</h2>
     <div class="cards" id="roster"></div>
   </section>
   <section>
-    <div class="panel-head"><h2 id="bench-title">Bench</h2></div>
-    <p class="hint" id="bench-hint">Drag a sub onto a player to bring them on.</p>
+    <h2>Bench</h2>
     <div class="cards" id="bench"></div>
   </section>
 </aside>
@@ -601,16 +598,12 @@ function benchOf(team) {
 function renderSide() {
   // The panel always shows your team: the starting XI, then the bench
   const team = state.home;
-  document.getElementById("lineup-title").textContent = `Line-up · ${team.formation}` + (avgOvr(team) ? ` · ${avgOvr(team)}` : "");
   const r = document.getElementById("roster"); r.replaceChildren();
   for (const p of team.players) r.appendChild(playerCard(p.num, p.full || p.name, p.pos, p.ovr,
     { kind: "xi", key: p.id, sel: p.id === selected, onTap: () => select(p.id) }));
 
   const bench = document.getElementById("bench"); bench.replaceChildren();
   const subs = benchOf(team);
-  document.getElementById("bench-title").textContent = `Bench · ${subs.length}`;
-  document.getElementById("bench-hint").textContent = !team.club ? "Pick a club above the pitch to fill the bench."
-    : "Drag a sub onto a player here or on the pitch to bring them on. Drag two starters onto each other to swap them.";
   for (const pl of subs) bench.appendChild(playerCard(pl.num, pl.full, pl.natural, pl.ovr,
     { kind: "bench", key: pl.pid, onTap: () => substitute(pl) }));
   if (!selected) document.getElementById("editor").hidden = true;
@@ -760,11 +753,6 @@ document.getElementById("load").onclick = () => {
   if (matchActive) endMatch();
   try { const s = JSON.parse(localStorage.getItem("tactics-board")); if (s) { state = s; selected = null; render(); toast("Loaded"); } else toast("Nothing saved yet"); }
   catch { toast("Loading isn't available here"); }
-};
-document.getElementById("copy").onclick = async () => {
-  const t = state.home;
-  const text = `${t.name} (${t.formation})\n` + t.players.map(p => `${p.num.padStart(2)}  ${p.pos.padEnd(4)} ${p.name}`).join("\n");
-  try { await navigator.clipboard.writeText(text); toast("Line-up copied"); } catch { toast("Copy was blocked by the browser"); }
 };
 let toastTimer;
 function toast(msg) {
