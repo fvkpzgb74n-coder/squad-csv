@@ -123,6 +123,7 @@ function fullTime() {
 
 const scoreLine = () => `${state.home.name} ${match.score.home}–${match.score.away} ${state.away.name}`;
 
+const FORWARD_DEPTH = 24; // metres ahead of the back line on the board that makes a player a forward
 const CIRCLE_R = 9.15; // centre circle radius in metres
 const COUNTDOWN = 3;   // real seconds of 3-2-1 before each kick-off
 const MIDFIELD = ["DM", "CM", "AM", "CDM", "CAM", "LM", "RM"];
@@ -269,7 +270,12 @@ function movePlayers(dt) {
     const chase = match.pause <= 0 && !match.shot && (!attacking || (!match.owner && !match.passTo));
     // Height of our back line, in metres from our own goal, set by where the ball is
     const ballU = d * (b.x - ownGoalX(side));
+    // The opposition's last outfield defender: our forwards play off this line
+    const opp = otherSide(side), od = dirOf(opp);
+    const oppLineU = Math.min(...squadList(opp).filter(p => p.pos !== "GK").map(p => od * (p.x - ownGoalX(opp))));
+    const oppLineX = ownGoalX(opp) + od * oppLineU;
     const shape = {
+      oppLineX,
       ref: Math.min(...list.filter(p => p.pos !== "GK").map(p => d * (p.bx - ownGoalX(side)))),
       line: attacking ? clamp(ballU - 24, 22, 60) : clamp(ballU - 18, 16, 58),
     };
@@ -298,7 +304,13 @@ function movePlayers(dt) {
         const u = shape.line + depth * (attacking ? 1.3 : 0.8);
         tx = ownGoalX(side) + d * u;
         ty = attacking ? p.by + (b.y - 34) * 0.3 : 34 + (p.by - 34) * 0.8 + (b.y - 34) * 0.4;
-        if (attacking && depth > 25) ty += Math.sin(match.clock / 40 + p.bx * 7) * 4; // forwards drift to find space
+        if (depth > FORWARD_DEPTH) {
+          // Forwards play right up against the opposition's back line: on its shoulder when we
+          // attack, a few metres off it when we defend, ready to press their centre-backs
+          tx = shape.oppLineX - d * (attacking ? 0.5 : 2.5);
+          if (attacking) ty += Math.sin(match.clock / 40 + p.bx * 7) * 4; // drift to find space
+          sprint = Math.abs(tx - p.x) > 2.5; // keep up with the line as it moves
+        }
         tx = clamp(tx, 3, PITCH_L - 3);
       }
       const pace = attr(p, "pace");
