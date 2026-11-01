@@ -41,7 +41,7 @@ h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter
 .score { color: var(--muted); font-variant-numeric: tabular-nums; }
 .toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
 .pitch-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
-svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 170px); touch-action: none; user-select: none; }
+svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 100px); touch-action: none; user-select: none; }
 aside { font-family: var(--font-panel); font-size: 18px; letter-spacing: .02em; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
 aside h2 { font-family: var(--font-panel); font-weight: 400; font-size: 20px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
 label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
@@ -88,12 +88,43 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card .pos { color: var(--muted); font-size: 17px; }
 #bench .card { background: transparent; }
 .drag-ghost { position: fixed; z-index: 10; pointer-events: none; width: 260px; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
-.setup { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.team-setup { display: flex; align-items: center; gap: 6px; }
-.team-setup input { width: 140px; }
-.team-setup select { width: auto; }
-.vs { color: var(--muted); font-size: 13px; }
-.board-actions { margin-left: auto; }
+/* Scoreboard: team v team, score and clock, in the shirt-lettering font */
+.scoreboard {
+  align-self: center; display: flex; align-items: stretch; gap: 0; position: relative;
+  font-family: var(--font-panel); background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+}
+.sb-side { position: relative; display: flex; }
+.sb-team {
+  display: flex; align-items: center; gap: 10px; background: none; border: none; border-radius: 0;
+  padding: 8px 16px; font: inherit; font-size: 26px; letter-spacing: .03em; color: var(--ink); min-width: 210px;
+}
+.sb-side:first-child .sb-team { justify-content: flex-end; }
+.sb-team:hover { background: var(--bg); }
+.sb-kit { width: 14px; height: 22px; border-radius: 3px; flex: none; }
+.sb-score {
+  display: flex; align-items: center; gap: 8px; padding: 0 16px; background: var(--bg);
+  font-size: 34px; font-variant-numeric: tabular-nums; border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+}
+.sb-dash { color: var(--muted); }
+.sb-clock {
+  display: flex; align-items: center; padding: 0 16px; border-left: 1px solid var(--line);
+  font-size: 26px; font-variant-numeric: tabular-nums; color: var(--home-sleeve); min-width: 86px; justify-content: center;
+}
+.sb-controls { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-left: 1px solid var(--line); }
+.sb-btn { font-family: var(--font-panel); font-size: 18px; min-width: 38px; height: 34px; padding: 0 8px; }
+#kickoff { background: var(--home-sleeve); color: #0f1612; border-color: var(--home-sleeve); }
+.popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; width: 230px; display: grid; gap: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+  font-family: var(--font-body); box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+.popover.right { left: auto; right: 0; }
+.popover[hidden] { display: none; }
+.popover select { margin-bottom: 0; }
+@media (max-width: 820px) {
+  .sb-team { min-width: 0; font-size: 20px; padding: 6px 10px; }
+  .sb-score, .sb-clock { font-size: 22px; padding: 0 10px; }
+}
 .player { cursor: grab; }
 .player.dragging { cursor: grabbing; }
 .player text { pointer-events: none; }
@@ -108,40 +139,35 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 </head>
 <body>
 <main>
-  <header>
-    <h1>Tactics Board</h1>
-    <span class="score" id="summary"></span>
-  </header>
-  <div class="setup">
-    <div class="team-setup">
-      <span class="team-pill" style="background:linear-gradient(90deg,var(--home-sleeve) 0 25%,var(--home) 25% 75%,var(--home-sleeve) 75%)"></span>
-      <input type="text" id="home-club" list="club-list" autocomplete="off" placeholder="Search clubs" aria-label="Your club">
-      <select id="home-formation" aria-label="Your formation"></select>
+  <div class="scoreboard" role="group" aria-label="Scoreboard">
+    <div class="sb-side">
+      <button class="sb-team" id="home-team-btn" aria-haspopup="true" aria-controls="home-pop">
+        <span class="sb-kit" style="background:linear-gradient(90deg,var(--home-sleeve) 0 25%,var(--home) 25% 75%,var(--home-sleeve) 75%)"></span>
+        <span class="sb-name" id="sb-home-name"></span>
+      </button>
+      <div class="popover" id="home-pop" hidden>
+        <label for="home-club">Club</label><input type="text" id="home-club" list="club-list" autocomplete="off" placeholder="Search clubs">
+        <label for="home-formation">Formation</label><select id="home-formation"></select>
+      </div>
     </div>
-    <span class="vs">vs</span>
-    <div class="team-setup">
-      <span class="team-pill" style="background:var(--away)"></span>
-      <input type="text" id="away-club" list="club-list" autocomplete="off" placeholder="Search clubs" aria-label="Opposition club">
-      <select id="away-formation" aria-label="Opposition formation"></select>
+    <div class="sb-score"><span id="sb-home-score">0</span><span class="sb-dash">-</span><span id="sb-away-score">0</span></div>
+    <div class="sb-side">
+      <button class="sb-team" id="away-team-btn" aria-haspopup="true" aria-controls="away-pop">
+        <span class="sb-name" id="sb-away-name"></span>
+        <span class="sb-kit" style="background:var(--away)"></span>
+      </button>
+      <div class="popover right" id="away-pop" hidden>
+        <label for="away-club">Club</label><input type="text" id="away-club" list="club-list" autocomplete="off" placeholder="Search clubs">
+        <label for="away-formation">Formation</label><select id="away-formation"></select>
+      </div>
     </div>
-    <div class="toolbar board-actions">
-      <button id="save">Save</button>
-      <button id="load">Load</button>
-      <button id="reset">Reset</button>
+    <div class="sb-clock" id="sb-clock">00:00</div>
+    <div class="sb-controls">
+      <button class="sb-btn" id="kickoff" aria-label="Kick off">&#9654;</button>
+      <button class="sb-btn" id="speed" hidden aria-label="Match speed">1&times;</button>
+      <button class="sb-btn" id="end-match" hidden aria-label="End match">&#9632;</button>
     </div>
     <datalist id="club-list"></datalist>
-  </div>
-  <div class="toolbar" role="toolbar" aria-label="Tools">
-    <button id="tool-move" aria-pressed="true">Move</button>
-    <button id="tool-pass" aria-pressed="false">Pass arrow</button>
-    <button id="tool-run" aria-pressed="false">Run arrow</button>
-    <button id="undo-arrow">Undo arrow</button>
-    <button id="clear-arrows">Clear arrows</button>
-    <button id="toggle-away" aria-pressed="true">Show opposition</button>
-    <button id="toggle-ball" aria-pressed="true">Show ball</button>
-    <button id="kickoff" class="primary">Kick off</button>
-    <button id="speed" hidden>Speed 1×</button>
-    <button id="end-match" hidden>End match</button>
   </div>
   <div class="pitch-wrap">
     <svg id="pitch" viewBox="-4 -4 76 113" aria-label="Football pitch, 68 by 105 metres, your team attacking upwards">
@@ -623,16 +649,13 @@ function renderSide() {
   for (const pl of subs) bench.appendChild(playerCard(pl.num, pl.full, pl.natural, pl.ovr,
     { kind: "bench", key: pl.pid, onTap: () => substitute(pl) }));
   if (!selected) document.getElementById("editor").hidden = true;
-  const label = t => `${t.name} ${t.formation}` + (avgOvr(t) ? ` (${avgOvr(t)})` : "");
-  document.getElementById("summary").textContent = label(state.home) + (state.showAway ? `  vs  ${label(state.away)}` : "");
+  updateScoreboard();
   document.getElementById("home-formation").value = state.home.formation;
   document.getElementById("away-formation").value = state.away.formation;
   for (const s of ["home", "away"]) {
     const box = document.getElementById(s + "-club");
     if (document.activeElement !== box) box.value = state[s].club || state[s].name;
   }
-  document.getElementById("toggle-away").setAttribute("aria-pressed", state.showAway);
-  document.getElementById("toggle-ball").setAttribute("aria-pressed", state.showBall);
 }
 
 function substitute(pl, out = findPlayer(selected)) {
@@ -747,29 +770,34 @@ for (const side of ["home","away"]) {
   s.addEventListener("change", e => applyFormation(side, e.target.value));
   document.getElementById(side + "-club").addEventListener("change", e => {
     const club = e.target.value.trim();
-    if (DB.clubs[club]) { loadClub(side, club); toast(`${club} loaded`); e.target.blur(); }
+    if (DB.clubs[club]) { loadClub(side, club); toast(`${club} loaded`); e.target.blur(); document.getElementById(side + "-pop").hidden = true; }
     else if (club) toast(`No club called "${club}". Pick one from the list.`);
   });
 }
-const tools = { move: "tool-move", pass: "tool-pass", run: "tool-run" };
-for (const [t, id] of Object.entries(tools)) document.getElementById(id).addEventListener("click", () => {
-  tool = t; for (const [t2, id2] of Object.entries(tools)) document.getElementById(id2).setAttribute("aria-pressed", t === t2);
-  svg.style.cursor = t === "move" ? "" : "crosshair";
+// Tap a team name on the scoreboard to change its club or formation
+for (const side of ["home", "away"]) {
+  const btn = document.getElementById(side + "-team-btn"), pop = document.getElementById(side + "-pop");
+  btn.addEventListener("click", () => {
+    if (matchActive) { toast("Teams can be changed once the match is over"); return; }
+    const open = pop.hidden;
+    document.querySelectorAll(".popover").forEach(p => { p.hidden = true; });
+    pop.hidden = !open;
+  });
+}
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".sb-side")) document.querySelectorAll(".popover").forEach(p => { p.hidden = true; });
 });
-document.getElementById("undo-arrow").onclick = () => { state.arrows.pop(); render(); };
-document.getElementById("clear-arrows").onclick = () => { state.arrows = []; render(); };
-document.getElementById("toggle-away").onclick = () => { state.showAway = !state.showAway; render(); };
-document.getElementById("toggle-ball").onclick = () => { state.showBall = !state.showBall; render(); };
-document.getElementById("reset").onclick = () => { if (matchActive) endMatch(); state = startingState(); selected = null; render(); toast("Board reset"); };
-document.getElementById("save").onclick = () => {
-  try { localStorage.setItem("tactics-board", JSON.stringify(state)); toast("Saved in this browser"); }
-  catch { toast("Saving isn't available here"); }
-};
-document.getElementById("load").onclick = () => {
-  if (matchActive) endMatch();
-  try { const s = JSON.parse(localStorage.getItem("tactics-board")); if (s) { state = s; selected = null; render(); toast("Loaded"); } else toast("Nothing saved yet"); }
-  catch { toast("Loading isn't available here"); }
-};
+function updateScoreboard() {
+  const m = typeof match !== "undefined" && match.active ? match : null;
+  document.getElementById("sb-home-name").textContent = state.home.name;
+  document.getElementById("sb-away-name").textContent = state.away.name;
+  document.getElementById("sb-home-score").textContent = m ? m.score.home : 0;
+  document.getElementById("sb-away-score").textContent = m ? m.score.away : 0;
+  const secs = m ? Math.floor(m.clock) : 0;
+  document.getElementById("sb-clock").textContent = m?.over ? "FT"
+    : m && m.half === 2 && m.clock === 45 * 60 && m.pause > 0 ? "HT"
+    : `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+}
 let toastTimer;
 function toast(msg) {
   const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");

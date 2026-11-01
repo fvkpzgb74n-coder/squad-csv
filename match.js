@@ -402,25 +402,22 @@ function addEvent(text, big) {
 
 function updateMatchUI() {
   const on = match.active;
-  document.getElementById("kickoff").textContent = !on ? "Kick off" : match.over ? "Full time" : match.running ? "Pause" : "Resume";
-  document.getElementById("kickoff").disabled = on && match.over;
-  document.getElementById("speed").hidden = !on;
-  document.getElementById("speed").textContent = `Speed ${match.speed}×`;
-  document.getElementById("end-match").hidden = !on;
-  document.getElementById("end-match").textContent = match.over ? "Back to board" : "End match";
+  const ko = document.getElementById("kickoff");
+  ko.innerHTML = !on || (!match.running && !match.over) ? "&#9654;" : match.over ? "&#8634;" : "&#10074;&#10074;";
+  ko.setAttribute("aria-label", !on ? "Kick off" : match.over ? "Back to the board" : match.running ? "Pause" : "Resume");
+  document.getElementById("speed").hidden = !on || match.over;
+  document.getElementById("speed").textContent = `${match.speed}×`;
+  document.getElementById("end-match").hidden = !on || match.over;
   document.getElementById("match-panel").hidden = !on && !match.events?.length;
-  for (const id of ["tool-pass", "tool-run", "undo-arrow", "clear-arrows", "toggle-away", "toggle-ball"]) document.getElementById(id).disabled = on;
-  if (!on) { if (!match.events?.length) document.getElementById("events").replaceChildren(); return; }
-  const total = match.possTime.home + match.possTime.away || 1;
-  const pct = Math.round((match.possTime.home / total) * 100);
-  const clock = match.over ? "FT" : match.pause > 0 && match.half === 2 && match.clock === 45 * 60 ? "HT" : `${minute()}'`;
-  document.getElementById("summary").textContent =
-    `${scoreLine()} · ${clock} · Possession ${pct}–${100 - pct} · Shots ${match.shots.home}–${match.shots.away}`;
+  if (!on && !match.events?.length) document.getElementById("events").replaceChildren();
+  updateScoreboard();
 }
 
 document.getElementById("kickoff").addEventListener("click", () => {
+  document.querySelectorAll(".popover").forEach(p => { p.hidden = true; });
   if (!match.active) startMatch();
-  else if (!match.over) { match.running = !match.running; match.last = null; updateMatchUI(); }
+  else if (match.over) { match.events = []; endMatch(); }
+  else { match.running = !match.running; match.last = null; updateMatchUI(); }
 });
 document.getElementById("speed").addEventListener("click", () => {
   match.speed = match.speed === 4 ? 1 : match.speed * 2; updateMatchUI();
