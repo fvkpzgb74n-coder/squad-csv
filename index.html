@@ -571,7 +571,7 @@ for (const [field, key] of [["ed-num","num"],["ed-pos","pos"],["ed-name","name"]
 }
 
 // Star rating out of 5 from the overall rating, in half-star steps every 4 points
-const STAR_BANDS = [[86, 5], [82, 4.5], [78, 4], [74, 3.5], [70, 3], [66, 2.5], [62, 2], [58, 1.5], [54, 1]];
+const STAR_BANDS = [[87, 5], [83, 4.5], [79, 4], [75, 3.5], [71, 3], [67, 2.5], [63, 2], [59, 1.5], [55, 1]];
 const starsFor = ovr => (STAR_BANDS.find(([min]) => (ovr || 0) >= min) || [0, 0.5])[1];
 
 function playerCard(num, name, pos, ovr, opts) {
