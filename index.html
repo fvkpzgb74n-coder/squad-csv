@@ -6,7 +6,7 @@
 <title>Tactics Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Press+Start+2P&family=Silkscreen&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Press+Start+2P&family=Silkscreen&family=Jersey+10&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Layout: pitch fills the left, a slim control rail on the right; stacks on phones. Single dark "floodlit stadium" world. */
 :root {
@@ -26,6 +26,7 @@
   --grass-b: #2b7040;
   --font-display: "Oswald", "Arial Narrow", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-panel: "Jersey 10", "IBM Plex Sans", system-ui, sans-serif; /* pixel-styled but clean, like shirt lettering */
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -41,8 +42,8 @@ h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter
 .toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
 .pitch-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 170px); touch-action: none; user-select: none; }
-aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
-aside h2 { font-family: var(--font-display); font-weight: 500; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+aside { font-family: var(--font-panel); font-size: 18px; letter-spacing: .02em; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+aside h2 { font-family: var(--font-panel); font-weight: 400; font-size: 20px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
 label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 select, input[type=text] {
   width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 5px;
@@ -55,8 +56,8 @@ button {
 button:hover { border-color: var(--muted); }
 button.primary { background: var(--home-sleeve); color: #0f1612; border-color: var(--home-sleeve); font-weight: 600; }
 button:disabled { opacity: .4; cursor: default; }
-.events { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 180px; overflow-y: auto; font-size: 13px; color: var(--muted); }
-.events li.big { color: var(--ink); font-weight: 600; }
+.events { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 180px; overflow-y: auto; font-size: 17px; color: var(--muted); }
+.events li.big { color: var(--ink); }
 button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 :focus-visible { outline: 2px solid var(--home-sleeve); outline-offset: 2px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -66,8 +67,8 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 /* Player cards: each one can be dragged onto another to make a sub or swap */
 .cards { display: grid; gap: 8px; }
 .card {
-  display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px;
-  background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 9px 12px;
+  display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 12px;
   cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .card:hover { border-color: var(--muted); }
@@ -83,8 +84,8 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card .stars.silver .on { color: #c4ccd2; }
 .card .stars.bronze .on { color: #c8834a; }
 .card .stars .on::before { content: "★★★★★"; }
-.card .nm { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card .pos { color: var(--muted); font-size: 12px; font-weight: 500; }
+.card .nm { font-size: 22px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .pos { color: var(--muted); font-size: 17px; }
 #bench .card { background: transparent; }
 .drag-ghost { position: fixed; z-index: 10; pointer-events: none; width: 260px; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 .setup { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
