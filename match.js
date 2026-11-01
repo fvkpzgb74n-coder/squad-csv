@@ -22,7 +22,16 @@ const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 0.5;
 const squadList = side => state[side].players;
 const everyone = () => [...state.home.players, ...state.away.players];
 const keeperOf = side => squadList(side).find(p => p.pos === "GK") || squadList(side)[0];
-const attr = (p, key) => p[key] || p.ovr || 60;
+// Tired players lose pace first, and some sharpness on the ball and in the tackle
+const FATIGUE = { pace: 0.3, dribbling: 0.15, defending: 0.15, physical: 0.2 };
+const attr = (p, key) => {
+  const base = p[key] || p.ovr || 60;
+  const f = FATIGUE[key];
+  return f ? base * (1 - f * (1 - (p.energy ?? 100) / 100)) : base;
+};
+// Stamina drain in % per match minute: about 30–55% over 90 minutes depending on the stamina rating.
+// Keepers barely run, so they tire far more slowly; sprinting tires everyone faster.
+const drainRate = p => (0.3 + (100 - (p.stamina || 65)) / 150) * (p.pos === "GK" ? 0.25 : 1);
 const minute = () => Math.min(90, Math.floor(match.clock / 60) + 1);
 
 function segDist(p, a, b) { // distance from point p to the segment a–b
@@ -39,7 +48,7 @@ function startMatch() {
     positions: everyone().map(p => [p, p.x, p.y]),
   };
   state.showAway = state.showBall = true;
-  for (const p of everyone()) { p.bx = p.x; p.by = p.y; p.cool = 0; }
+  for (const p of everyone()) { p.bx = p.x; p.by = p.y; p.cool = 0; p.energy = 100; }
   Object.assign(match, {
     active: true, running: true, over: false, clock: 0, half: 1,
     score: { home: 0, away: 0 }, shots: { home: 0, away: 0 }, possTime: { home: 0, away: 0 },
@@ -59,6 +68,7 @@ function startMatch() {
 function endMatch() {
   match.active = match.running = false;
   matchActive = false;
+  for (const p of everyone()) p.energy = 100;
   const s = match.saved;
   if (s) {
     for (const [p, x, y] of s.positions) { p.x = x; p.y = y; }
@@ -323,6 +333,9 @@ function movePlayers(dt) {
         }
         tx = clamp(tx, 3, PITCH_L - 3);
       }
+      if (match.pause <= 0 && !(match.countdown > 0)) {
+        p.energy = Math.max(0, (p.energy ?? 100) - (dt * CLOCK_RATE / 60) * drainRate(p) * (sprint ? 1.4 : 0.9));
+      }
       const pace = attr(p, "pace");
       const speed = (4.2 + pace * 0.042) * (sprint ? 1 : 0.8) * (p === match.owner ? 0.85 : 1) * (match.pause > 0 ? 0.6 : 1);
       const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy);
@@ -487,6 +500,7 @@ function updateMatchUI() {
   document.getElementById("speed").hidden = !on || match.over;
   document.getElementById("speed").textContent = `${match.speed}×`;
   document.getElementById("end-match").hidden = !on || match.over;
+  updateStaminaBars();
   const t = { home: tacticsFor("home"), away: tacticsFor("away") };
   const setT = (id, v) => { document.getElementById(id).textContent = v; };
   setT("st-def-h", t.home.defLine); setT("st-def-a", t.away.defLine);

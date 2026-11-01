@@ -38,7 +38,7 @@ html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg); background-image: var(--wash); background-attachment: fixed;
   color: var(--ink); font-family: var(--font-body); font-size: 14px;
-  display: grid; grid-template-columns: 1fr 340px; grid-template-rows: minmax(0, 1fr); gap: 16px; padding: 16px;
+  display: grid; grid-template-columns: 1fr 380px; grid-template-rows: minmax(0, 1fr); gap: 16px; padding: 16px;
 }
 main { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
@@ -96,6 +96,8 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card .stars.silver .on { color: #c4ccd2; }
 .card .stars.bronze .on { color: #c8834a; }
 .card .stars .on::before { content: "★★★★★"; }
+.card .stamina { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: #1c2040; overflow: hidden; margin-top: 2px; }
+.card .stamina span { display: block; height: 100%; width: 100%; border-radius: 3px; transition: width .5s ease, background-color .5s ease; }
 .card .nm { font-size: 22px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .pos { color: var(--muted); font-size: 17px; }
 #bench .card { background: transparent; }
@@ -283,8 +285,8 @@ const SLOT_FIT = {
   RW: ["RW", "RM"], LW: ["LW", "LM"], ST: ["ST", "CF"],
 };
 const POS_ORDER = ["GK", "RB", "RWB", "CB", "LB", "LWB", "CDM", "CM", "CAM", "RM", "LM", "RW", "LW", "CF", "ST"];
-const squadOf = club => (DB.clubs[club]?.players || []).map(([pid, name, full, num, pos, other, ovr, foot, pace, shooting, passing, dribbling, defending, physical]) =>
-  ({ pid, name, full, num, natural: pos, other: other ? other.split(" ") : [], ovr, foot, pace, shooting, passing, dribbling, defending, physical }));
+const squadOf = club => (DB.clubs[club]?.players || []).map(([pid, name, full, num, pos, other, ovr, foot, pace, shooting, passing, dribbling, defending, physical, stamina]) =>
+  ({ pid, name, full, num, natural: pos, other: other ? other.split(" ") : [], ovr, foot, pace, shooting, passing, dribbling, defending, physical, stamina }));
 
 // How well a player suits a slot: their rating, less a penalty for playing out of position
 function fitScore(pl, slot) {
@@ -315,7 +317,7 @@ function pickXI(squad, formation) {
   cbSlots.forEach((slot, k) => { chosen[slot] = cbs[k]; });
   return chosen;
 }
-const RATINGS = ["ovr", "pace", "shooting", "passing", "dribbling", "defending", "physical"];
+const RATINGS = ["ovr", "pace", "shooting", "passing", "dribbling", "defending", "physical", "stamina"];
 // A club's formation: the shape whose best XI plays most in their natural positions.
 // The CSV has no team tactics, so this is inferred from the squad rather than taken from real life.
 // Back fours are the norm, so other shapes need a squad that clearly suits them.
@@ -639,6 +641,23 @@ for (const [field, key] of [["ed-num","num"],["ed-pos","pos"],["ed-name","name"]
 const STAR_BANDS = [[87, 5], [83, 4.5], [79, 4], [75, 3.5], [71, 3], [67, 2.5], [63, 2], [59, 1.5], [55, 1]];
 const starsFor = ovr => (STAR_BANDS.find(([min]) => (ovr || 0) >= min) || [0, 0.5])[1];
 
+// Stamina bar: moves in 10% steps, from bright green through lime, yellow and orange to red
+const STAMINA_COLOURS = [[90, "#2fe36b"], [70, "#a8e33a"], [50, "#f2d43a"], [30, "#f28c35"], [0, "#e5484d"]];
+function paintStamina(card, energy) {
+  const bar = card.querySelector(".stamina span"); if (!bar) return;
+  const step = Math.max(0, Math.ceil(energy / 10) * 10);
+  if (bar.dataset.step === String(step)) return;
+  bar.dataset.step = step;
+  bar.style.width = `${step}%`;
+  bar.style.background = STAMINA_COLOURS.find(([min]) => step >= min)[1];
+  card.querySelector(".stamina").title = `Stamina ${step}%`;
+}
+function updateStaminaBars() {
+  for (const p of state.home.players) {
+    const card = document.querySelector(`#roster .card[data-key="${p.id}"]`);
+    if (card) paintStamina(card, p.energy ?? 100);
+  }
+}
 function playerCard(num, name, pos, ovr, opts) {
   const d = document.createElement("div");
   d.className = "card" + (opts.sel ? " sel" : "") + (pos === "GK" ? " keeper" : "");
@@ -651,6 +670,10 @@ function playerCard(num, name, pos, ovr, opts) {
   d.querySelector(".stars .on").style.width = `${(st / 5) * 100}%`;
   d.querySelector(".nm").textContent = name || "—";
   d.querySelector(".pos").textContent = pos;
+  if (opts.kind === "xi") {
+    d.insertAdjacentHTML("beforeend", `<span class="stamina"><span></span></span>`);
+    paintStamina(d, opts.energy ?? 100);
+  }
   makeCardDraggable(d, opts.onTap);
   return d;
 }
@@ -668,7 +691,7 @@ function renderSide() {
   const team = state.home;
   const r = document.getElementById("roster"); r.replaceChildren();
   for (const p of team.players) r.appendChild(playerCard(p.num, p.full || p.name, p.pos, p.ovr,
-    { kind: "xi", key: p.id, sel: p.id === selected, onTap: () => select(p.id) }));
+    { kind: "xi", key: p.id, sel: p.id === selected, energy: p.energy, onTap: () => select(p.id) }));
 
   const bench = document.getElementById("bench"); bench.replaceChildren();
   const subs = benchOf(team);
@@ -689,6 +712,7 @@ function substitute(pl, out = findPlayer(selected)) {
   if (!out || out.side !== "home") { toast("Drag the sub onto the player they're replacing"); return; }
   const off = out.name;
   Object.assign(out, fromDb(pl));
+  out.energy = 100; // fresh legs
   if (matchActive) addEvent(`${minute()}' Substitution: ${pl.name} on for ${off}.`);
   toast(`${pl.name} on for ${off}`);
   render();
@@ -696,7 +720,7 @@ function substitute(pl, out = findPlayer(selected)) {
 // Swap two starters: each takes the other's place in the formation
 function swapPlayers(a, b) {
   if (a === b) return;
-  const keys = ["pid", "name", "full", "num", ...RATINGS];
+  const keys = ["pid", "name", "full", "num", "energy", ...RATINGS];
   for (const k of keys) [a[k], b[k]] = [b[k], a[k]];
   toast(`${a.name} and ${b.name} swapped`);
   render();

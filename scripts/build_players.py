@@ -12,7 +12,7 @@ SRC = ROOT / "data" / "players.csv"
 OUT = ROOT / "players.js"
 
 
-ATTRIBUTES = ["pace", "shooting", "passing", "dribbling", "defending", "physical"]
+ATTRIBUTES = ["pace", "shooting", "passing", "dribbling", "defending", "physical", "stamina"]
 
 
 def as_int(value):
@@ -45,7 +45,7 @@ def main():
     for club in clubs.values():
         club["players"].sort(key=lambda p: -p[6])
     data = {
-        "fields": ["id", "shirtName", "name", "number", "position", "otherPositions", "overall", "foot", "pace", "shooting", "passing", "dribbling", "defending", "physical"],
+        "fields": ["id", "shirtName", "name", "number", "position", "otherPositions", "overall", "foot", "pace", "shooting", "passing", "dribbling", "defending", "physical", "stamina"],
         "clubs": dict(sorted(clubs.items())),
     }
     OUT.write_text(
