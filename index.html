@@ -372,6 +372,26 @@ function bestFormation(club) {
   }
   return best;
 }
+// Named substitutes allowed: the Premier League allows 9. Other competitions use the same until set here.
+const BENCH_SIZES = { "England Premier League (1)": 9 };
+const benchSize = club => BENCH_SIZES[DB.clubs[club]?.league] ?? 9;
+// A real matchday bench: a back-up keeper, then cover in defence, midfield and attack, then the best of the rest
+const POSITION_GROUP = { GK: "GK", CB: "DEF", RB: "DEF", LB: "DEF", RWB: "DEF", LWB: "DEF",
+  CDM: "MID", CM: "MID", CAM: "MID", RM: "MID", LM: "MID", RW: "FWD", LW: "FWD", CF: "FWD", ST: "FWD" };
+function pickBench(squad, xi, size) {
+  const inXI = new Set(xi.filter(Boolean).map(pl => pl.pid));
+  const pool = squad.filter(pl => !inXI.has(pl.pid)).sort((a, b) => b.ovr - a.ovr);
+  const bench = [];
+  for (const group of ["GK", "DEF", "MID", "FWD"]) {
+    const best = pool.find(pl => POSITION_GROUP[pl.natural] === group && !bench.includes(pl));
+    if (best && bench.length < size) bench.push(best);
+  }
+  for (const pl of pool) {
+    if (bench.length >= size) break;
+    if (!bench.includes(pl) && !(pl.natural === "GK" && bench.some(b => b.natural === "GK"))) bench.push(pl);
+  }
+  return bench;
+}
 function fromDb(pl) {
   if (!pl) return {};
   const out = { pid: pl.pid, name: pl.name, full: pl.full, num: pl.num };
@@ -411,6 +431,8 @@ function applyFormation(side, formation) {
   if (team.club && DB.clubs[team.club]) {
     const xi = pickXI(squadOf(team.club), formation);
     team.players = fresh.map((p, i) => ({ ...p, ...fromDb(xi[i]) }));
+    team.bench = pickBench(squadOf(team.club), xi, benchSize(team.club)).map(pl => pl.pid);
+    team.subbedOff = [];
   } else {
     team.players = fresh.map((p, i) => ({ ...p, name: team.players[i]?.name || "", num: team.players[i]?.num || p.num }));
   }
@@ -765,9 +787,12 @@ const avgOvr = team => {
   return r.length ? Math.round(r.reduce((a, b) => a + b, 0) / r.length) : null;
 };
 function benchOf(team) {
+  if (!team.club) return [];
+  const squad = squadOf(team.club);
   const onPitch = new Set(team.players.map(p => p.pid));
-  return team.club ? squadOf(team.club).filter(pl => !onPitch.has(pl.pid))
-    .sort((a, b) => POS_ORDER.indexOf(a.natural) - POS_ORDER.indexOf(b.natural) || b.ovr - a.ovr) : [];
+  const named = team.bench ?? pickBench(squad, squad.filter(pl => onPitch.has(pl.pid)), benchSize(team.club)).map(pl => pl.pid);
+  return squad.filter(pl => named.includes(pl.pid) && !onPitch.has(pl.pid))
+    .sort((a, b) => POS_ORDER.indexOf(a.natural) - POS_ORDER.indexOf(b.natural) || b.ovr - a.ovr);
 }
 function renderSide() {
   // The panel always shows your team: the starting XI, then the bench
@@ -797,7 +822,14 @@ function renderSide() {
 
 function substitute(pl, out = findPlayer(selected)) {
   if (!out || out.side !== "home") { toast("Drag the sub onto the player they're replacing"); return; }
-  const off = out.name;
+  const off = out.name, offPid = out.pid;
+  const team = state[out.side];
+  // The sub leaves the bench. Before kick-off the dropped starter takes his place on the bench;
+  // during a match a substituted player is out of the game.
+  team.bench = (team.bench || benchOf(team).map(b => b.pid)).filter(id => id !== pl.pid);
+  if (offPid != null) {
+    if (matchActive) (team.subbedOff ||= []).push(offPid); else team.bench.push(offPid);
+  }
   Object.assign(out, fromDb(pl));
   out.energy = 100; // fresh legs
   if (matchActive) addEvent(`${minute()}' Substitution: ${pl.name} on for ${off}.`);
