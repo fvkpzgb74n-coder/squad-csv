@@ -411,9 +411,11 @@ function carrierThink(dt) {
   const ownHalf = d * (c.x - ownGoalX(c.side)) < PITCH_L / 2;
   const pressed = pressure < 4;
   const progressWeight = (ownHalf ? 0.25 : 0.5) * (0.6 + tempo * 0.8); // ×1 at 50, more forward-minded when quicker
-  // Poor dribblers (centre-backs, holding players) look for the simple, short pass instead of carrying it
-  const dri = attr(c, "dribbling");
-  const keepItSimple = Math.max(0, (76 - dri) / 3);
+  // Dribbling skill is judged against the player's own level: a 64-rated winger with 70 dribbling is a
+  // good dribbler for his level, a centre-back usually dribbles well below his overall.
+  // Typical gaps: wingers +2 (best +5 or more), full-backs -3, centre-backs -13.
+  const flairGap = attr(c, "dribbling") - (c.ovr || attr(c, "dribbling"));
+  const keepItSimple = Math.max(0, (-flairGap - 1) * 0.5); // poor dribblers look for the simple, short pass
   let best = null, bestScore = -Infinity;
   for (const m of mates) {
     const L = dist(c, m);
@@ -434,12 +436,12 @@ function carrierThink(dt) {
   const ahead = opp.filter(o => d * (o.x - c.x) > 0 && dist(o, c) < 10);
   const room = ahead.length ? Math.min(...ahead.map(o => dist(o, c))) : 10;
   // Good dribblers want to carry it and take players on; poor ones would rather not
-  const flair = (dri - 68) / 3; // about +6 for a 86 dribbler, -4 for a 56
+  const flair = 3 + flairGap * 1.3; // about +10 for a standout dribbler, +5 for a typical winger, -14 for a centre-back
   const dribble = c.pos === "GK" ? -100
     : room * 1.2 + flair + Math.random() * 4 - (pressure < 2 ? 4 : 0) - (ownHalf ? 3 : 0);
 
   // Tightly marked, most players move it on; the best dribblers may still try to beat their man
-  const mustRelease = pressure < 2.2 && dri < 78;
+  const mustRelease = pressure < 2.2 && flairGap < 3;
   if (best && (bestScore > dribble || mustRelease)) return pass(c, best);
   c.dx = clamp(c.x + d * 10, 1, PITCH_L - 1);
   c.dy = clamp(c.y + (34 - c.y) * 0.25 + gauss() * 3, 2, PITCH_W - 2);
