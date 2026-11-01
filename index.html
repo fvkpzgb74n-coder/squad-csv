@@ -66,7 +66,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 /* Player cards: each one can be dragged onto another to make a sub or swap */
 .cards { display: grid; gap: 8px; }
 .card {
-  display: grid; grid-template-columns: 34px 1fr auto 30px; align-items: center; gap: 10px;
+  display: grid; grid-template-columns: 1fr auto auto 26px; align-items: center; gap: 10px;
   background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 9px 12px;
   cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
@@ -74,12 +74,12 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card.sel { border-color: var(--home-sleeve); }
 .card.drop-target { border-color: var(--home-sleeve); background: #1f2f2a; box-shadow: 0 0 0 2px var(--home-sleeve) inset; }
 .card.drag-source { opacity: .35; }
-.card .num {
-  width: 34px; height: 28px; display: grid; place-items: center; border-radius: 5px;
-  background: var(--home); color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; font-size: 14px;
-  box-shadow: inset 4px 0 0 var(--home-sleeve), inset -4px 0 0 var(--home-sleeve);
+.card .stars {
+  position: relative; display: inline-block; font-size: 15px; letter-spacing: 1px; line-height: 1; color: var(--line);
 }
-.card.keeper .num { background: var(--home-gk); box-shadow: none; }
+.card .stars::before { content: "★★★★★"; }
+.card .stars .on { position: absolute; inset: 0 auto 0 0; overflow: hidden; white-space: nowrap; color: #f2c230; }
+.card .stars .on::before { content: "★★★★★"; }
 .card .nm { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .pos { color: var(--muted); font-size: 12px; font-weight: 500; }
 .card .ovr { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; text-align: right; }
@@ -568,12 +568,19 @@ for (const [field, key] of [["ed-num","num"],["ed-pos","pos"],["ed-name","name"]
   });
 }
 
+// Star rating out of 5 from the overall rating, in half-star steps every 4 points
+const STAR_BANDS = [[86, 5], [82, 4.5], [78, 4], [74, 3.5], [70, 3], [66, 2.5], [62, 2], [58, 1.5], [54, 1]];
+const starsFor = ovr => (STAR_BANDS.find(([min]) => (ovr || 0) >= min) || [0, 0.5])[1];
+
 function playerCard(num, name, pos, ovr, opts) {
   const d = document.createElement("div");
   d.className = "card" + (opts.sel ? " sel" : "") + (pos === "GK" ? " keeper" : "");
   d.dataset.kind = opts.kind; d.dataset.key = opts.key;
-  d.innerHTML = `<span class="num"></span><span class="nm"></span><span class="pos"></span><span class="ovr"></span>`;
-  d.querySelector(".num").textContent = num;
+  d.innerHTML = `<span class="nm"></span><span class="pos"></span><span class="stars"><span class="on"></span></span><span class="ovr"></span>`;
+  const st = starsFor(ovr);
+  d.querySelector(".stars").setAttribute("aria-label", `${st} out of 5 stars`);
+  d.querySelector(".stars").title = `${st} / 5`;
+  d.querySelector(".stars .on").style.width = `${(st / 5) * 100}%`;
   d.querySelector(".nm").textContent = name || "—";
   d.querySelector(".pos").textContent = pos;
   d.querySelector(".ovr").textContent = ovr ?? "";
