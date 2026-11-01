@@ -241,12 +241,19 @@ function movePlayers(dt) {
     outfield.sort((p, q) => dist(p, b) - dist(q, b));
     const [chaser, cover] = outfield;
     const chase = match.pause <= 0 && !match.shot && (!attacking || (!match.owner && !match.passTo));
+    // Height of our back line, in metres from our own goal, set by where the ball is
+    const ballU = d * (b.x - ownGoalX(side));
+    const shape = {
+      ref: Math.min(...list.filter(p => p.pos !== "GK").map(p => d * (p.bx - ownGoalX(side)))),
+      line: attacking ? clamp(ballU - 24, 22, 60) : clamp(ballU - 18, 16, 58),
+    };
     for (const p of list) {
       let tx, ty, sprint = false;
       if (p === match.owner) {
         tx = p.dx ?? p.x + d * 3; ty = p.dy ?? p.y;
       } else if (p.pos === "GK") {
-        tx = ownGoalX(side) + d * (attacking ? 9 : 2.5);
+        // Sweeper keeper: steps up behind a high line
+        tx = ownGoalX(side) + d * clamp(shape.line * (attacking ? 0.4 : 0.15), 2.5, attacking ? 22 : 10);
         ty = 34 + (b.y - 34) * 0.25;
       } else if (p === match.passTo && match.pause <= 0) {
         // Run onto the line of the pass
@@ -258,13 +265,15 @@ function movePlayers(dt) {
       } else if (!attacking && p === cover && match.pause <= 0) {
         tx = b.x - d * 6; ty = b.y + (34 - b.y) * 0.3; // sit between the ball and our goal
       } else {
-        // Team shape: the board position, shifted with the ball and pushed up when we have it
-        const shift = (b.x - PITCH_L / 2) * 0.5 + d * (attacking ? 13 : -3);
-        tx = p.bx + shift; ty = p.by + (b.y - 34) * 0.35;
-        if (attacking && d * (p.bx - PITCH_L / 2) > -8) { // forwards make runs
-          tx += d * 9; ty += Math.sin(match.clock / 40 + p.bx * 7) * 5;
-        }
-        tx = d > 0 ? clamp(tx, 6, PITCH_L - 3) : clamp(tx, 3, PITCH_L - 6);
+        // Team shape: keep each player's place in the board formation, but set the block's height and
+        // depth from the ball. Defending, the back line steps up behind the ball and the team squeezes;
+        // attacking, the team stretches so forwards play on the opposition's back line.
+        const depth = d * (p.bx - ownGoalX(side)) - shape.ref; // metres in front of our back line on the board
+        const u = shape.line + depth * (attacking ? 1.3 : 0.8);
+        tx = ownGoalX(side) + d * u;
+        ty = attacking ? p.by + (b.y - 34) * 0.3 : 34 + (p.by - 34) * 0.8 + (b.y - 34) * 0.4;
+        if (attacking && depth > 25) ty += Math.sin(match.clock / 40 + p.bx * 7) * 4; // forwards drift to find space
+        tx = clamp(tx, 3, PITCH_L - 3);
       }
       const pace = attr(p, "pace");
       const speed = (4.2 + pace * 0.042) * (sprint ? 1 : 0.8) * (p === match.owner ? 0.85 : 1) * (match.pause > 0 ? 0.6 : 1);
