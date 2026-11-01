@@ -38,7 +38,7 @@ html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg); background-image: var(--wash); background-attachment: fixed;
   color: var(--ink); font-family: var(--font-body); font-size: 14px;
-  display: grid; grid-template-columns: 1fr 380px; grid-template-rows: minmax(0, 1fr); gap: 16px; padding: 16px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 640px; grid-template-rows: minmax(0, 1fr); gap: 16px; padding: 16px;
 }
 main { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
@@ -78,9 +78,13 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 #editor[hidden] { display: none; }
 /* Player cards: each one can be dragged onto another to make a sub or swap */
 .cards { display: grid; gap: 8px; }
+/* Your team and the opposition side by side; the opposition's cards mirror yours */
+.teams { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.team-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+aside h2.right { text-align: right; }
 .card {
-  display: grid; grid-template-columns: 30px 1fr auto 50px; align-items: center; gap: 10px;
-  background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 12px;
+  display: grid; grid-template-columns: 26px minmax(0, 1fr) auto 40px; align-items: center; gap: 8px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px;
   cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .card:hover { border-color: var(--muted); }
@@ -88,31 +92,37 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .card.drop-target { border-color: var(--accent); background: #161b3c; box-shadow: 0 0 0 2px var(--accent) inset; }
 .card.drag-source { opacity: .35; }
 /* 8-bit star rating: pixel stars with black outlines, tier colour set on the svg */
-.card .stars { display: block; width: 74px; height: 14px; image-rendering: pixelated; }
+.card .stars { display: block; width: 62px; height: 12px; image-rendering: pixelated; }
+.card.away { grid-template-columns: 40px auto minmax(0, 1fr) 26px; cursor: pointer; }
+.card.away .stamina { order: 1; }
+.card.away .stars { order: 2; }
+.card.away .nm { order: 3; text-align: right; }
+.card.away .pos { order: 4; text-align: right; }
 .card .stars.gold { color: #f6c84a; }
 .card .stars.silver { color: #c9d1d8; }
 .card .stars.bronze { color: #cf8a4e; }
 /* 8-bit stamina bar: one solid bar inside a square black frame */
-.card .stamina { display: block; width: 50px; height: 14px; padding: 2px; background: #000; box-shadow: 0 0 0 1px #2a2f55; }
+.card .stamina { display: block; width: 40px; height: 12px; padding: 2px; background: #000; box-shadow: 0 0 0 1px #2a2f55; }
 .card .stamina i { display: block; height: 100%; background: #1a1d36; }
 .card .stamina i b { display: block; height: 100%; width: 100%; }
-.card .nm { text-transform: uppercase; font-size: 22px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card .pos { color: var(--muted); font-size: 17px; }
+.card .nm { text-transform: uppercase; font-size: 20px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .pos { color: var(--muted); font-size: 16px; }
 #bench .card { background: transparent; }
 .drag-ghost { position: fixed; z-index: 10; pointer-events: none; width: 260px; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 /* Scoreboard: team v team, score and clock, in the shirt-lettering font */
 .scoreboard {
-  align-self: center; display: flex; align-items: stretch; gap: 0; position: relative;
+  align-self: center; max-width: 100%; display: flex; align-items: stretch; gap: 0; position: relative;
   font-family: var(--font-panel); background: rgba(16, 18, 42, .85); border: 1px solid var(--line); border-radius: 8px;
 }
 .sb-side { position: relative; display: flex; }
 .sb-team {
   display: flex; align-items: center; gap: 10px; background: none; border: none; border-radius: 0;
-  padding: 8px 16px; font: inherit; font-size: 26px; letter-spacing: .03em; color: var(--ink); min-width: 210px;
+  padding: 8px 14px; font: inherit; font-size: 24px; letter-spacing: .03em; color: var(--ink); min-width: 0;
 }
 .sb-side:first-child .sb-team { justify-content: flex-end; }
 .sb-team:hover { background: var(--bg); }
 .sb-kit { width: 14px; height: 22px; border-radius: 3px; flex: none; }
+.sb-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .sb-score {
   display: flex; align-items: center; gap: 8px; padding: 0 16px; background: linear-gradient(180deg, #181c42, #0e1028);
   font-size: 34px; font-variant-numeric: tabular-nums; border-left: 1px solid var(--line); border-right: 1px solid var(--line);
@@ -120,7 +130,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .sb-dash { color: var(--muted); }
 .sb-clock {
   display: flex; align-items: center; padding: 0 16px; border-left: 1px solid var(--line);
-  font-size: 26px; font-variant-numeric: tabular-nums; color: var(--accent); min-width: 86px; justify-content: center;
+  font-size: 24px; font-variant-numeric: tabular-nums; color: var(--accent); min-width: 80px; justify-content: center;
 }
 .sb-controls { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-left: 1px solid var(--line); }
 .sb-btn { font-family: var(--font-panel); font-size: 18px; min-width: 38px; height: 34px; padding: 0 8px; }
@@ -142,6 +152,9 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .player text { pointer-events: none; }
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 5px; font-weight: 500; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
+@media (max-width: 1100px) {
+  body { grid-template-columns: minmax(0, 1fr) 560px; }
+}
 @media (max-width: 820px) {
   body { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
   svg#pitch { max-height: none; }
@@ -247,14 +260,24 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
     </div>
     <div style="margin-top:8px"><label for="ed-name">Name</label><input type="text" id="ed-name" maxlength="20"></div>
   </section>
-  <section>
-    <h2>Line-up</h2>
-    <div class="cards" id="roster"></div>
-  </section>
-  <section>
-    <h2>Bench</h2>
-    <div class="cards" id="bench"></div>
-  </section>
+  <div class="teams">
+    <div class="team-col">
+      <section>
+        <h2>Line-up</h2>
+        <div class="cards" id="roster"></div>
+      </section>
+      <section>
+        <h2>Bench</h2>
+        <div class="cards" id="bench"></div>
+      </section>
+    </div>
+    <div class="team-col">
+      <section>
+        <h2 class="right">Opposition</h2>
+        <div class="cards" id="away-roster"></div>
+      </section>
+    </div>
+  </div>
 </aside>
 <div class="drag-ghost" id="drag-ghost" hidden></div>
 <div class="toast" id="toast" role="status"></div>
@@ -714,8 +737,8 @@ function paintStamina(card, energy) {
   bar.title = `Stamina ${step}%`;
 }
 function updateStaminaBars() {
-  for (const p of state.home.players) {
-    const card = document.querySelector(`#roster .card[data-key="${p.id}"]`);
+  for (const p of [...state.home.players, ...state.away.players]) {
+    const card = document.querySelector(`.card[data-key="${p.id}"]`);
     if (card) paintStamina(card, p.energy ?? 100);
   }
 }
@@ -729,11 +752,12 @@ function playerCard(num, name, pos, ovr, opts) {
   d.innerHTML = `<span class="pos"></span><span class="nm"></span>${starsSvg(starsFor(ovr))}`;
   d.querySelector(".nm").textContent = name || "—";
   d.querySelector(".pos").textContent = pos;
-  if (opts.kind === "xi") {
+  if (opts.kind === "xi" || opts.kind === "away") {
     d.insertAdjacentHTML("beforeend", `<span class="stamina"><i><b></b></i></span>`);
     paintStamina(d, opts.energy ?? 100);
   }
-  makeCardDraggable(d, opts.onTap);
+  if (opts.kind === "away") { d.classList.add("away"); d.addEventListener("click", opts.onTap); }
+  else makeCardDraggable(d, opts.onTap);
   return d;
 }
 const avgOvr = team => {
@@ -751,6 +775,10 @@ function renderSide() {
   const r = document.getElementById("roster"); r.replaceChildren();
   for (const p of team.players) r.appendChild(playerCard(p.num, knownAs(p.name), p.pos, p.ovr,
     { kind: "xi", key: p.id, sel: p.id === selected, energy: p.energy, onTap: () => select(p.id) }));
+
+  const awayList = document.getElementById("away-roster"); awayList.replaceChildren();
+  for (const p of state.away.players) awayList.appendChild(playerCard(p.num, knownAs(p.name), p.pos, p.ovr,
+    { kind: "away", key: p.id, sel: p.id === selected, energy: p.energy, onTap: () => select(p.id) }));
 
   const bench = document.getElementById("bench"); bench.replaceChildren();
   const subs = benchOf(team);
@@ -845,7 +873,7 @@ function moveGhost(x, y) {
   const card = hit?.closest(".card");
   const pitchPlayer = hit?.closest?.(".player[data-id]");
   let target = null;
-  if (card && card !== drag.card && !(drag.kind === "bench" && card.dataset.kind === "bench")) target = card;
+  if (card && card !== drag.card && card.dataset.kind !== "away" && !(drag.kind === "bench" && card.dataset.kind === "bench")) target = card;
   if (pitchPlayer && pitchPlayer.dataset.id.startsWith("home")) target = pitchPlayer;
   if (drag.target && drag.target !== target) drag.target.classList.remove("drop-target");
   if (target && target.classList.contains("card")) target.classList.add("drop-target");
