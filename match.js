@@ -437,14 +437,21 @@ function carrierThink(dt) {
   const room = ahead.length ? Math.min(...ahead.map(o => dist(o, c))) : 10;
   // Good dribblers want to carry it and take players on; poor ones would rather not
   const flair = 3 + flairGap * 1.3; // about +10 for a standout dribbler, +5 for a typical winger, -14 for a centre-back
+  // Attacking channels: the wide and half-space areas of the final third. Players there are
+  // encouraged to take their man on and drive at the box, more so if they dribble well for their level.
+  const inChannel = d * (c.x - ownGoalX(c.side)) > PITCH_L * 2 / 3 && Math.abs(c.y - 34) > 9;
+  const channelUrge = inChannel ? 6 + Math.max(0, flairGap) * 0.6 : 0;
   const dribble = c.pos === "GK" ? -100
-    : room * 1.2 + flair + Math.random() * 4 - (pressure < 2 ? 4 : 0) - (ownHalf ? 3 : 0);
+    : room * 1.2 + flair + channelUrge + Math.random() * 4 - (pressure < 2 ? 4 : 0) - (ownHalf ? 3 : 0);
 
-  // Tightly marked, most players move it on; the best dribblers may still try to beat their man
-  const mustRelease = pressure < 2.2 && flairGap < 3;
+  // Tightly marked, most players move it on; good dribblers may still try to beat their man,
+  // and in the channels anyone dribbling at or above their level will have a go
+  const mustRelease = pressure < 2.2 && flairGap < (inChannel ? 0 : 3);
   if (best && (bestScore > dribble || mustRelease)) return pass(c, best);
-  c.dx = clamp(c.x + d * 10, 1, PITCH_L - 1);
-  c.dy = clamp(c.y + (34 - c.y) * 0.25 + gauss() * 3, 2, PITCH_W - 2);
+  c.dx = clamp(c.x + d * (inChannel ? 8 : 10), 1, PITCH_L - 1);
+  c.dy = inChannel
+    ? clamp(c.y + (34 - c.y) * 0.35 + gauss() * 2, 2, PITCH_W - 2) // drive at the box, cutting inside
+    : clamp(c.y + (34 - c.y) * 0.25 + gauss() * 3, 2, PITCH_W - 2);
 }
 
 function pass(c, m) {
