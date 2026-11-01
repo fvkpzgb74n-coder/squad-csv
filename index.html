@@ -322,7 +322,12 @@ const RATINGS = ["ovr", "pace", "shooting", "passing", "dribbling", "defending",
 // The CSV has no team tactics, so this is inferred from the squad rather than taken from real life.
 // Back fours are the norm, so other shapes need a squad that clearly suits them.
 const FORMATION_PRIOR = { "4-3-3": 1, "4-2-3-1": 1.5, "4-4-2": 0, "4-1-4-1": 0, "3-4-2-1": -2, "3-4-3": -2.5, "3-5-2": -2.5, "5-3-2": -4 };
+// Clubs whose real formation is set by hand; every other club's is inferred from its squad
+const CLUB_FORMATIONS = {
+  "Aston Villa": "4-2-3-1",
+};
 function bestFormation(club) {
+  if (CLUB_FORMATIONS[club]) return CLUB_FORMATIONS[club];
   const squad = squadOf(club);
   let best = "4-3-3", bestScore = -Infinity;
   for (const f of Object.keys(FORMATIONS)) {
