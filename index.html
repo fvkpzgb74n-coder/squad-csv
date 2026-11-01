@@ -11,14 +11,14 @@
 /* Layout: pitch fills the left, a slim control rail on the right; stacks on phones. Single dark "floodlit stadium" world. */
 :root {
   /* Interface: deep indigo with faded cyan and purple accents */
-  --bg: #121429;
-  --panel: #1a1d3a;
-  --line: #303663;
+  --bg: #0a0b18;
+  --panel: #10122a;
+  --line: #232849;
   --ink: #e4e7fb;
   --muted: #8d93c2;
   --accent: #7ccfe0;        /* faded cyan */
   --accent-2: #a892e0;      /* faded purple */
-  --wash: linear-gradient(150deg, #191a40 0%, #121a36 45%, #0f2234 100%);
+  --wash: linear-gradient(150deg, #0f0f28 0%, #0a0f22 45%, #08141f 100%);
   --home: #7a1e3c;          /* claret shirt */
   --home-sleeve: #9ccff0;   /* pale blue sleeves */
   --run: var(--home-sleeve);
@@ -47,7 +47,7 @@ h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter
 .toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
 .pitch-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 svg#pitch { width: 100%; height: 100%; max-height: calc(100vh - 100px); touch-action: none; user-select: none; }
-aside { font-family: var(--font-panel); font-size: 18px; letter-spacing: .02em; background: rgba(26, 29, 58, .82); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+aside { font-family: var(--font-panel); font-size: 18px; letter-spacing: .02em; background: rgba(16, 18, 42, .85); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
 aside h2 { font-family: var(--font-panel); font-weight: 400; font-size: 20px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); margin: 0 0 8px; }
 label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 select, input[type=text] {
@@ -78,7 +78,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 }
 .card:hover { border-color: var(--muted); }
 .card.sel { border-color: var(--accent-2); }
-.card.drop-target { border-color: var(--accent); background: #222a52; box-shadow: 0 0 0 2px var(--accent) inset; }
+.card.drop-target { border-color: var(--accent); background: #161b3c; box-shadow: 0 0 0 2px var(--accent) inset; }
 .card.drag-source { opacity: .35; }
 .card .stars {
   position: relative; display: inline-block; font-size: 15px; letter-spacing: 1px; line-height: 1; color: var(--line);
@@ -96,7 +96,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 /* Scoreboard: team v team, score and clock, in the shirt-lettering font */
 .scoreboard {
   align-self: center; display: flex; align-items: stretch; gap: 0; position: relative;
-  font-family: var(--font-panel); background: rgba(26, 29, 58, .82); border: 1px solid var(--line); border-radius: 8px;
+  font-family: var(--font-panel); background: rgba(16, 18, 42, .85); border: 1px solid var(--line); border-radius: 8px;
 }
 .sb-side { position: relative; display: flex; }
 .sb-team {
@@ -107,7 +107,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-c
 .sb-team:hover { background: var(--bg); }
 .sb-kit { width: 14px; height: 22px; border-radius: 3px; flex: none; }
 .sb-score {
-  display: flex; align-items: center; gap: 8px; padding: 0 16px; background: linear-gradient(180deg, #23285a, #171a38);
+  display: flex; align-items: center; gap: 8px; padding: 0 16px; background: linear-gradient(180deg, #181c42, #0e1028);
   font-size: 34px; font-variant-numeric: tabular-nums; border-left: 1px solid var(--line); border-right: 1px solid var(--line);
 }
 .sb-dash { color: var(--muted); }
